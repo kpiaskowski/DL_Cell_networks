@@ -20,7 +20,7 @@ def create_full_mask(org_w, org_h, annotations):
     are unnecesary, but not prohibited
     :return: binary numpy array of shape w x h x C with ones, where objects are present
     """
-    label = np.zeros([org_h, org_w, C], dtype=np.float32)
+    label = np.zeros([org_h, org_w, C], dtype=np.uint8)
     for annotation in annotations:
         class_id = annotation['category_id']
         bbox = annotation['bbox']
