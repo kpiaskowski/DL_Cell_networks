@@ -1,23 +1,19 @@
+import argparse
 import json
 import os
 import time
-from sys import getsizeof
 
 import numpy as np
-import tensorflow as tf
 
-from constants import C
 from utils import collect_annotations, create_full_mask, resize_mask
 
 
-def create_mask_dirs(train, val):
+def create_mask_dirs(dir):
     """
-    Creates directories for masks. Requires paths
+    Creates directory for masks. Requires path
     """
-    if not os.path.isdir(train):
-        os.mkdir(train)
-    if not os.path.isdir(val):
-        os.mkdir(val)
+    if not os.path.isdir(dir):
+        os.mkdir(dir)
 
 
 def create_masks(annotations_path, dst_dir, dst_w, dst_h):
@@ -38,7 +34,7 @@ def create_masks(annotations_path, dst_dir, dst_w, dst_h):
     data_len = len(images)
     for i, img_desc in enumerate(images):
         print('\rSaving masked labels: {} of {}, time left: {}, predicted size: {}'
-              .format(i+1,
+              .format(i + 1,
                       data_len,
                       calc_time_left(mean_time, data_len - i),
                       calc_pred_size(mean_size, data_len)),
@@ -85,35 +81,26 @@ def calc_time_left(mean_time, left_samples_n):
     return '{:3d}h{:3d}m{:3d}s'.format(h, m, s)
 
 
-def load_imgs_temp(dir):
-    # todo delete or use in another place
-    """
-    Saved code to read label
-    :param dir:
-    :return:
-    """
-    files = os.listdir(dir)
-    s = time.time()
-    for i, filename in enumerate(files):
-        print(i)
-        arrays = np.load(os.path.join(dir, filename))
-        slices = arrays['arr_0']
-        ids = arrays['arr_1']
-        label = np.zeros(shape=(dst_h, dst_w, C), dtype=np.uint8)
-        label[:, :, ids] = slices
-    e = time.time()
-    print(e - s)
+parser = argparse.ArgumentParser(description='Prepares labels')
+parser.add_argument('--annotations_path ', help='path to FILE with annotations - that is the one with JSON extension', dest='annotations_path')
+parser.add_argument('--labels_path', help='path to folder, where labels should be placed - it will be created automatically if not present yet',
+                    dest='labels_path')
+parser.add_argument('--dst_w', help='width of generated labels', dest='dst_w')
+parser.add_argument('--dst_h', help='height of generated labels', dest='dst_h')
 
+args = parser.parse_args()
 
-train_annotations = 'data/annotations/instances_train2017.json'
-val_annotations = 'data/annotations/instances_val2017.json'
-train_images = 'data/train2017'
-val_images = 'data/val2017'
-train_masks = 'data/train_masks'
-val_masks = 'data/val_masks'
+annotations_path = args.annotations_path
+labels_path = args.labels_path
+dst_w = args.dst_w
+dst_h = args.dst_h
 
-dst_w = 240
-dst_h = 240
+if any((i is None for i in (annotations_path, labels_path, dst_h, dst_w))):
+    raise Exception('Provide all parameters (images_path, annotations_path, labels_path, dst_h, dst_w)!')
 
-create_mask_dirs(train_masks, val_masks)
-create_masks(val_annotations, val_masks, dst_w, dst_h)
+create_mask_dirs(labels_path)
+create_masks(annotations_path, labels_path, int(dst_w), int(dst_h))
+
+# quick help
+# train_annotations = 'data/annotations/instances_train2017.json'
+# val_annotations = 'data/annotations/instances_val2017.json'
