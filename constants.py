@@ -1,6 +1,6 @@
 # convolutional
-img_w_conv = 484
-img_h_conv = 484
+img_w_conv = 448
+img_h_conv = 448
 label_w_conv = 14
 label_h_conv = 14
 batch_size_conv = 10

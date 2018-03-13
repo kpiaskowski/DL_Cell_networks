@@ -4,22 +4,20 @@ import cv2
 import numpy as np
 import tensorflow as tf
 
+from architectures.conv_decoder import conv_decoder
+from architectures.pretrained_encoder import pretrained_encoder as encoder
 from constants import img_w_conv, img_h_conv, label_w_conv, label_h_conv, batch_size_conv, C
-from convolutional import convolutional_model
+from dataprovider import datasets
 from utils import create_training_dirs, draw_predictions
 
 # experiment params
 epochs = 10
-l_rate = 0.0001
+l_rate = 0.00001
 thresh = 0.5
-model_name = 'test5'
-
-img_w = img_w_conv
-img_h = img_h_conv
-label_w = label_w_conv
-label_h = label_h_conv
+model_name = 'test'
+decoder = conv_decoder
+decoder_namespace = 'conv_decoder'
 batch_size = batch_size_conv
-architecture = convolutional_model
 
 t_img_path = 'data/val2017'
 v_img_path = 'data/val2017'
@@ -30,53 +28,10 @@ v_label_path = 'data/val_labels_S14'
 # data
 t_num_batches = len(os.listdir(t_label_path)) // batch_size
 v_num_batches = 5  # len(os.listdir(v_label_path)) // batch_size
+training_dataset_init, validation_dataset_init, img_input, labels = datasets(t_img_path, v_img_path, t_label_path, v_label_path)
 
-train_label_names = tf.constant(sorted(os.path.join(t_label_path, name) for name in os.listdir(t_label_path)))
-val_label_names = tf.constant(sorted(os.path.join(v_label_path, name) for name in os.listdir(v_label_path)))
-train_image_names = tf.constant(sorted(os.path.join(t_img_path, name) for name in os.listdir(t_img_path)))
-val_image_names = tf.constant(sorted(os.path.join(v_img_path, name) for name in os.listdir(v_img_path)))
-
-
-def dataset_resize_images(img_name, label_name):
-    """
-    Used within TF DatasetAPI, converts images and scales them to range (0...1)
-    """
-    image_string = tf.read_file(img_name)
-    image_decoded = tf.image.decode_jpeg(image_string, channels=3)
-    image_resized = tf.image.resize_images(image_decoded, [img_h, img_w])
-    image_resized /= 255
-    b, g, r = tf.split(image_resized, 3, 2)
-    return tf.concat([r, g, b], 2), label_name
-
-
-def dataset_convert_labels(img, label_name):
-    arrays = np.load(label_name.decode())
-    slices = arrays['arr_0']
-    ids = arrays['arr_1']
-    label = np.zeros(shape=(label_h, label_w, C), dtype=np.uint8)
-    label[:, :, ids] = slices
-    return img, label
-
-
-training_dataset = tf.data.Dataset.from_tensor_slices((train_image_names, train_label_names))
-training_dataset = training_dataset.map(dataset_resize_images)
-training_dataset = training_dataset.map(
-    lambda filename, label: tuple(tf.py_func(dataset_convert_labels, [filename, label], [tf.float32, tf.uint8], stateful=False)))
-training_dataset = training_dataset.shuffle(buffer_size=500)
-training_dataset = training_dataset.batch(batch_size)
-
-val_dataset = tf.data.Dataset.from_tensor_slices((val_image_names, val_label_names))
-val_dataset = val_dataset.map(dataset_resize_images)
-val_dataset = val_dataset.map(lambda filename, label: tuple(tf.py_func(dataset_convert_labels, [filename, label], [tf.float32, tf.uint8], stateful=False)))
-val_dataset = val_dataset.batch(batch_size)
-
-iterator = tf.data.Iterator.from_structure(training_dataset.output_types, training_dataset.output_shapes)
-img_input, labels = iterator.get_next()
-
-training_dataset_init = iterator.make_initializer(training_dataset)
-validation_dataset_init = iterator.make_initializer(val_dataset)
-
-logits = architecture(img_input)
+encoder = encoder(img_input)
+logits = decoder(encoder)
 
 output = tf.nn.sigmoid(logits)
 loss = tf.losses.sigmoid_cross_entropy(labels, logits)
@@ -84,7 +39,9 @@ train_op = tf.train.AdamOptimizer(l_rate).minimize(loss)
 
 # saving and logging
 create_training_dirs('saved_models', 'saved_summaries', 'generated_images', model_name)
-saver = tf.train.Saver()
+saver_decoder = tf.train.Saver(var_list=tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=decoder_namespace))
+saver_encoder = tf.train.Saver(var_list=tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='yolo'))
+
 with tf.name_scope('summaries'):
     tf.summary.scalar('loss', loss)
 merged = tf.summary.merge_all()
@@ -93,8 +50,10 @@ with tf.Session() as sess:
     train_writer = tf.summary.FileWriter(os.path.join('saved_summaries', model_name, 'train'), sess.graph)
     val_writer = tf.summary.FileWriter(os.path.join('saved_summaries', model_name, 'validation'))
     sess.run(tf.global_variables_initializer())
+    saver_encoder.restore(sess, 'pretrained_imagenet/pretrained_imagenet.ckpt')  # load pretrained encoder
+
     if len(os.listdir(os.path.join('saved_models', model_name))) > 0:
-        saver.restore(sess, os.path.join('saved_models', model_name, 'model.ckpt'))
+        saver_decoder.restore(sess, os.path.join('saved_models', model_name, 'model.ckpt'))
         print(model_name + ' loaded')
     else:
         print('Training %s from scratch' % model_name)
@@ -105,7 +64,7 @@ with tf.Session() as sess:
             _, cost, summary = sess.run([train_op, loss, merged])
             print("\rTraining, epoch: {} of {}, batch: {} of {}, cost: {}".format(epoch + 1, epochs, k + 1, t_num_batches, cost), end='', flush=True)
             train_writer.add_summary(summary, epoch * t_num_batches + k)
-        saver.save(sess, os.path.join('saved_models', model_name, 'model.ckpt'))
+        saver_decoder.save(sess, os.path.join('saved_models', model_name, 'model.ckpt'))
         print()
 
         sess.run(validation_dataset_init)
@@ -116,10 +75,11 @@ with tf.Session() as sess:
         masks, imgs = sess.run([output, img_input])
         print()
 
-        for i in range(batch_size):
+        for i in range(3):
             mask = masks[i]
             img = imgs[i]
+            print(np.max(mask))
             mask[mask >= thresh] = 1
             mask[mask < thresh] = 0
             labelled_img = draw_predictions(img, mask)
-            cv2.imwrite(os.path.join('generated_images', model_name, 'e_' + str(epoch+1) + '_i_' + str(i) + '.jpg'), labelled_img * 255)
+            cv2.imwrite(os.path.join('generated_images', model_name, 'e_' + str(epoch + 1) + '_i_' + str(i) + '.jpg'), labelled_img * 255)
