@@ -1,5 +1,5 @@
 import json
-
+import os
 import cv2
 import numpy as np
 from constants import C, colors, id_to_class
@@ -107,8 +107,9 @@ def draw_predictions(img, mask, show_mask=True, show_boxes=True):
 
         for plane in color_masks:
             output_color_mask = cv2.add(output_color_mask, plane)
+        if np.max(output_color_mask) != 0:
+            output_color_mask /= np.max(output_color_mask)
 
-        output_color_mask /= np.max(output_color_mask)
         new_img = cv2.addWeighted(new_img, 0.6, output_color_mask, 1, 0)
 
     if show_boxes:
@@ -134,3 +135,19 @@ def draw_predictions(img, mask, show_mask=True, show_boxes=True):
                                       color=(0, 0, 0))
 
     return new_img
+
+def create_training_dirs(save_path, summary_path, generated_imgs, model_name):
+    """
+    Creates directories for saving models and summaries
+    """
+    if not os.path.isdir(save_path):
+        os.mkdir(save_path)
+    if not os.path.isdir(summary_path):
+        os.mkdir(summary_path)
+    if not os.path.isdir(generated_imgs):
+        os.mkdir(generated_imgs)
+    if not os.path.isdir(os.path.join(save_path, model_name)):
+        os.mkdir(os.path.join(save_path, model_name))
+    if not os.path.isdir(os.path.join(generated_imgs, model_name)):
+        os.mkdir(os.path.join(generated_imgs, model_name))
+

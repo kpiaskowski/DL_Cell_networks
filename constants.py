@@ -1,9 +1,9 @@
 # convolutional
-img_w = 484
-img_h = 484
-label_w = 14
-label_h = 14
-batch_size = 10
+img_w_conv = 484
+img_h_conv = 484
+label_w_conv = 14
+label_h_conv = 14
+batch_size_conv = 10
 
 C = 80
 

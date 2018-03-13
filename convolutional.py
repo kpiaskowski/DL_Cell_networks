@@ -6,14 +6,14 @@ you have to modify network layers.
 import numpy as np
 import tensorflow as tf
 
-from constants import img_h, img_w, C
+from constants import img_h_conv, img_w_conv, C
 
 
 def convolutional_model(input_placeholder):
     """Returns convolutional model"""
 
     with tf.variable_scope('convolutional'):
-        net = tf.reshape(input_placeholder, shape=[-1, img_h, img_w, 3])  # hack to make TF work - DatasetAPI somehow doesn't pass number of channels :/
+        net = tf.reshape(input_placeholder, shape=[-1, img_h_conv, img_w_conv, 3])  # hack to make TF work - DatasetAPI somehow doesn't pass number of channels :/
         net = tf.pad(net, np.array([[0, 0], [3, 3], [3, 3], [0, 0]]))
         net = tf.layers.conv2d(net,
                                filters=64,
@@ -153,5 +153,5 @@ def convolutional_model(input_placeholder):
                                filters=C,
                                kernel_size=(1, 1),
                                kernel_initializer=tf.contrib.layers.xavier_initializer(),
-                               activation=tf.nn.leaky_relu)
+                               activation=None)
         return net
