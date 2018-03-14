@@ -13,12 +13,12 @@ def conv_decoder(encoder_output):
                                filters=256,
                                kernel_size=(1, 1),
                                padding='same',
-                               kernel_initializer=tf.contrib.layers.xavier_initializer(),
+                               kernel_initializer=tf.truncated_normal_initializer(0.0, 0.01),
                                activation=tf.nn.leaky_relu)
         net = tf.layers.conv2d(net,
                                filters=C,
                                kernel_size=(1, 1),
                                padding='same',
-                               kernel_initializer=tf.contrib.layers.xavier_initializer(),
+                               kernel_initializer=tf.truncated_normal_initializer(0.0, 0.01),
                                activation=None)
         return net

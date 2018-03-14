@@ -27,7 +27,7 @@ def dataset_convert_labels(img, label_name):
     ids = arrays['arr_1']
     label = np.zeros(shape=(label_h, label_w, C), dtype=np.uint8)
     label[:, :, ids] = slices
-    return img, label
+    return img, label.astype(np.float32)
 
 def datasets(t_img_path, v_img_path, t_label_path, v_label_path):
     """
@@ -42,14 +42,14 @@ def datasets(t_img_path, v_img_path, t_label_path, v_label_path):
     training_dataset = tf.data.Dataset.from_tensor_slices((train_image_names, train_label_names))
     training_dataset = training_dataset.map(dataset_resize_images)
     training_dataset = training_dataset.map(
-        lambda filename, label: tuple(tf.py_func(dataset_convert_labels, [filename, label], [tf.float32, tf.uint8], stateful=False)))
-    training_dataset = training_dataset.shuffle(buffer_size=500)
+        lambda filename, label: tuple(tf.py_func(dataset_convert_labels, [filename, label], [tf.float32, tf.float32], stateful=False)))
+    training_dataset = training_dataset.shuffle(buffer_size=3000)
     training_dataset = training_dataset.batch(batch_size)
 
     val_dataset = tf.data.Dataset.from_tensor_slices((val_image_names, val_label_names))
     val_dataset = val_dataset.map(dataset_resize_images)
-    val_dataset = val_dataset.map(lambda filename, label: tuple(tf.py_func(dataset_convert_labels, [filename, label], [tf.float32, tf.uint8], stateful=False)))
-    val_dataset = val_dataset.shuffle(buffer_size=500)
+    val_dataset = val_dataset.map(lambda filename, label: tuple(tf.py_func(dataset_convert_labels, [filename, label], [tf.float32, tf.float32], stateful=False)))
+    val_dataset = val_dataset.shuffle(buffer_size=3000)
     val_dataset = val_dataset.batch(batch_size)
 
     iterator = tf.data.Iterator.from_structure(training_dataset.output_types, training_dataset.output_shapes)

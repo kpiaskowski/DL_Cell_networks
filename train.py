@@ -3,10 +3,10 @@ import os
 import cv2
 import numpy as np
 import tensorflow as tf
-
 from architectures.conv_decoder import conv_decoder
 from architectures.pretrained_encoder import pretrained_encoder as encoder
-from constants import img_w_conv, img_h_conv, label_w_conv, label_h_conv, batch_size_conv, C
+
+from constants import batch_size_conv
 from dataprovider import datasets
 from utils import create_training_dirs, draw_predictions
 
@@ -14,7 +14,7 @@ from utils import create_training_dirs, draw_predictions
 epochs = 10
 l_rate = 0.00001
 thresh = 0.5
-model_name = 'test'
+model_name = 'test6'
 decoder = conv_decoder
 decoder_namespace = 'conv_decoder'
 batch_size = batch_size_conv
@@ -26,16 +26,23 @@ t_label_path = 'data/val_labels_S14'
 v_label_path = 'data/val_labels_S14'
 
 # data
-t_num_batches = len(os.listdir(t_label_path)) // batch_size
+t_num_batches = 200  # len(os.listdir(t_label_path)) // batch_size
 v_num_batches = 5  # len(os.listdir(v_label_path)) // batch_size
+
 training_dataset_init, validation_dataset_init, img_input, labels = datasets(t_img_path, v_img_path, t_label_path, v_label_path)
 
 encoder = encoder(img_input)
 logits = decoder(encoder)
 
 output = tf.nn.sigmoid(logits)
-loss = tf.losses.sigmoid_cross_entropy(labels, logits)
-train_op = tf.train.AdamOptimizer(l_rate).minimize(loss)
+
+# loss = tf.losses.sigmoid_cross_entropy(labels, logits)
+loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=labels, logits=logits)
+loss = tf.reduce_mean(loss)
+
+trainable_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'conv_decoder')
+train_op = tf.train.AdamOptimizer(l_rate).minimize(loss, var_list=trainable_vars)
+# train_op = tf.train.AdamOptimizer(l_rate).minimize(loss)
 
 # saving and logging
 create_training_dirs('saved_models', 'saved_summaries', 'generated_images', model_name)
@@ -72,14 +79,22 @@ with tf.Session() as sess:
             cost, summary = sess.run([loss, merged])
             print("\rTesting, epoch: {} of {}, batch: {} of {}, cost: {}".format(epoch + 1, epochs, k + 1, v_num_batches, cost), end='', flush=True)
             val_writer.add_summary(summary, epoch * v_num_batches + k)
-        masks, imgs = sess.run([output, img_input])
+        masks, imgs, gt_labels = sess.run([output, img_input, labels])
         print()
 
-        for i in range(3):
+        for i in range(5):
             mask = masks[i]
             img = imgs[i]
             print(np.max(mask))
             mask[mask >= thresh] = 1
             mask[mask < thresh] = 0
             labelled_img = draw_predictions(img, mask)
-            cv2.imwrite(os.path.join('generated_images', model_name, 'e_' + str(epoch + 1) + '_i_' + str(i) + '.jpg'), labelled_img * 255)
+
+            gt_mask = gt_labels[i]
+            gt_mask[gt_mask >= thresh] = 1
+            gt_mask[gt_mask < thresh] = 0
+            gt_labelled_img = draw_predictions(img, gt_mask)
+
+            result_img = np.hstack([labelled_img, gt_labelled_img])
+
+            cv2.imwrite(os.path.join('generated_images', model_name, 'e_' + str(epoch + 1) + '_i_' + str(i) + '.jpg'), result_img * 255)
