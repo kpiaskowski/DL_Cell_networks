@@ -5,15 +5,7 @@ import time
 
 import numpy as np
 
-from utils import collect_annotations, create_full_mask, resize_mask
-
-
-def create_mask_dirs(dir):
-    """
-    Creates directory for masks. Requires path
-    """
-    if not os.path.isdir(dir):
-        os.mkdir(dir)
+from utils import collect_annotations, create_full_mask, resize_mask, create_mask_dirs, calc_time_left, calc_pred_size
 
 
 def create_masks(annotations_path, dst_dir, dst_w, dst_h):
@@ -60,47 +52,27 @@ def create_masks(annotations_path, dst_dir, dst_w, dst_h):
         mean_size = i / (i + 1) * mean_size + resized.nbytes / (i + 1)
 
 
-def calc_pred_size(mean_size, n_samples):
-    """
-    Calculates predicted size of dataset. Requires mean size of single sample in bytes
-    """
-    size = int(mean_size * n_samples / (2 ** 20))
-    gigabytes = size // 1024
-    megabytes = (size - gigabytes * 1024)
-    return '{:d} GB {:d} MB'.format(gigabytes, megabytes)
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Prepares labels')
+    parser.add_argument('--annotations_path ', help='path to FILE with annotations - that is the one with JSON extension', dest='annotations_path')
+    parser.add_argument('--labels_path', help='path to folder, where labels should be placed - it will be created automatically if not present yet',
+                        dest='labels_path')
+    parser.add_argument('--dst_w', help='width of generated labels', dest='dst_w')
+    parser.add_argument('--dst_h', help='height of generated labels', dest='dst_h')
 
+    args = parser.parse_args()
 
-def calc_time_left(mean_time, left_samples_n):
-    """
-    Computes formatted left time of any operation, given mean time of single operation and left number of samples
-    """
-    time_left = int(mean_time * left_samples_n)
-    h = time_left // 3660
-    m = (time_left - h * 3600) // 60
-    s = (time_left - h * 3600 - m * 60)
-    return '{:3d}h{:3d}m{:3d}s'.format(h, m, s)
+    annotations_path = args.annotations_path
+    labels_path = args.labels_path
+    dst_w = args.dst_w
+    dst_h = args.dst_h
 
+    if any((i is None for i in (annotations_path, labels_path, dst_h, dst_w))):
+        raise Exception('Provide all parameters (images_path, annotations_path, labels_path, dst_h, dst_w)!')
 
-# parser = argparse.ArgumentParser(description='Prepares labels')
-# parser.add_argument('--annotations_path ', help='path to FILE with annotations - that is the one with JSON extension', dest='annotations_path')
-# parser.add_argument('--labels_path', help='path to folder, where labels should be placed - it will be created automatically if not present yet',
-#                     dest='labels_path')
-# parser.add_argument('--dst_w', help='width of generated labels', dest='dst_w')
-# parser.add_argument('--dst_h', help='height of generated labels', dest='dst_h')
-#
-# args = parser.parse_args()
-#
-# annotations_path = args.annotations_path
-# labels_path = args.labels_path
-# dst_w = args.dst_w
-# dst_h = args.dst_h
-#
-# if any((i is None for i in (annotations_path, labels_path, dst_h, dst_w))):
-#     raise Exception('Provide all parameters (images_path, annotations_path, labels_path, dst_h, dst_w)!')
-#
-# create_mask_dirs(labels_path)
-# create_masks(annotations_path, labels_path, int(dst_w), int(dst_h))
+    create_mask_dirs(labels_path)
+    create_masks(annotations_path, labels_path, int(dst_w), int(dst_h))
 
-# quick help
+# quick path help
 # train_annotations = 'data/annotations/instances_train2017.json'
 # val_annotations = 'data/annotations/instances_val2017.json'

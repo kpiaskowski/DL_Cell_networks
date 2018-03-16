@@ -8,7 +8,8 @@ def conv_decoder(encoder_output):
     """
     Creates a convolutional, few layer overlay on pretrained encoder
     """
-    with tf.variable_scope('conv_decoder'):
+    namescope = 'conv_decoder'
+    with tf.variable_scope(namescope):
         net = tf.layers.conv2d(encoder_output,
                                filters=256,
                                kernel_size=(1, 1),
@@ -21,4 +22,4 @@ def conv_decoder(encoder_output):
                                padding='same',
                                kernel_initializer=tf.truncated_normal_initializer(0.0, 0.1),
                                activation=None)
-        return net
+        return net, namescope

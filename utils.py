@@ -1,7 +1,8 @@
-import json
 import os
+
 import cv2
 import numpy as np
+
 from constants import C, colors, id_to_class
 
 # COCO classes aren't indexed from zero and there are leaps between indices higher than 1
@@ -14,6 +15,7 @@ def create_full_mask(org_w, org_h, annotations):
     Creates tensor h x w x C with embedded binary masks. Preserves original image size. If there are multiple overlapping
     instances of objects of the same class, binary mask doesn't take it into account - it produces only one mask per
     class
+    :param id_to_id_dict: translates ids from one id_space to other - simple 1 to 1 dict in case of imagenet, but coco requires translation dict (ids are not consecutive)
     :param org_w: original image width
     :param org_h: original image heigth
     :param annotations: list of dicts - each item in dict should contain keys: 'category_id' -> int and 'bbox' -> [x, y, w, h] - other
@@ -75,8 +77,7 @@ def compute_bboxes(mask):
     contours = [cv2.findContours(plane.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[1] for plane in mask_planes]
     coords = [[cv2.boundingRect(cnt) for cnt in contour] for contour in contours]
     continuous_id_boxes = [[i, xywh] for i, xywh in enumerate(coords) if xywh]
-    COCO_bboxes = [[contid_to_COCOid[i], xywh] for i, xywh in enumerate(coords) if xywh]
-    return dict(continuous_id_boxes), dict(COCO_bboxes)
+    return dict(continuous_id_boxes)
 
 
 def draw_predictions(img, mask, show_mask=True, show_boxes=True):
@@ -84,6 +85,7 @@ def draw_predictions(img, mask, show_mask=True, show_boxes=True):
     Draws prediction on image. Resizes mask automatically in order to match img size.
     :param img: real valued image (values from 0 to 1)
     :param mask: binary 3d mask
+    :param id_to_class: dictionary translating id to class names
     :param show_mask: True if mask should be drawn on image else False
     :param show_boxes: True if bounding boxes should be drawn
     :return: Img with drawn objects
@@ -113,7 +115,7 @@ def draw_predictions(img, mask, show_mask=True, show_boxes=True):
         new_img = cv2.addWeighted(new_img, 0.6, output_color_mask, 1, 0)
 
     if show_boxes:
-        boxes, _ = compute_bboxes(mask)
+        boxes = compute_bboxes(mask)
         for k, v in boxes.items():
             for box in v:
                 new_img = cv2.rectangle(new_img,
@@ -136,6 +138,36 @@ def draw_predictions(img, mask, show_mask=True, show_boxes=True):
 
     return new_img
 
+
+def calc_pred_size(mean_size, n_samples):
+    """
+    Calculates predicted size of dataset. Requires mean size of single sample in bytes
+    """
+    size = int(mean_size * n_samples / (2 ** 20))
+    gigabytes = size // 1024
+    megabytes = (size - gigabytes * 1024)
+    return '{:d} GB {:d} MB'.format(gigabytes, megabytes)
+
+
+def calc_time_left(mean_time, left_samples_n):
+    """
+    Computes formatted left time of any operation, given mean time of single operation and left number of samples
+    """
+    time_left = int(mean_time * left_samples_n)
+    h = time_left // 3660
+    m = (time_left - h * 3600) // 60
+    s = (time_left - h * 3600 - m * 60)
+    return '{:3d}h{:3d}m{:3d}s'.format(h, m, s)
+
+
+def create_mask_dirs(directory):
+    """
+    Creates directory for masks. Requires path
+    """
+    if not os.path.isdir(directory):
+        os.mkdir(directory)
+
+
 def create_training_dirs(save_path, summary_path, generated_imgs, model_name):
     """
     Creates directories for saving models and summaries
@@ -151,3 +183,17 @@ def create_training_dirs(save_path, summary_path, generated_imgs, model_name):
     if not os.path.isdir(os.path.join(generated_imgs, model_name)):
         os.mkdir(os.path.join(generated_imgs, model_name))
 
+def debug_and_save_imgs(image, mask, gt_mask, thresh, filepath):
+    """
+    Draws generated and ground truth bounding boxes for debugging purpose
+    """
+    mask[mask >= thresh] = 1
+    mask[mask < thresh] = 0
+    labelled_img = draw_predictions(image, mask)
+
+    gt_mask[gt_mask >= thresh] = 1
+    gt_mask[gt_mask < thresh] = 0
+    gt_labelled_img = draw_predictions(image, gt_mask)
+
+    result_img = np.hstack([labelled_img, gt_labelled_img])
+    cv2.imwrite(filepath, result_img * 255)

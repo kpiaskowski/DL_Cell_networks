@@ -2,7 +2,7 @@ import tensorflow as tf
 
 slim = tf.contrib.slim
 import numpy as np
-from constants import img_h_conv, img_w_conv, C
+from constants import img_h, img_w, C
 
 
 def pretrained_encoder(input_placeholder):
@@ -15,7 +15,7 @@ def pretrained_encoder(input_placeholder):
                             weights_initializer=tf.truncated_normal_initializer(0.0, 0.01),
                             weights_regularizer=slim.l2_regularizer(0.0005)):
             # hack to make TF work - DatasetAPI somehow doesn't pass number of channels
-            net = tf.reshape(input_placeholder, shape=[-1, img_h_conv, img_w_conv, 3])
+            net = tf.reshape(input_placeholder, shape=[-1, img_h, img_w, 3])
             net = tf.pad(net, np.array([[0, 0], [3, 3], [3, 3], [0, 0]]), name='pad_1')
             net = slim.conv2d(net, 64, 7, 2, padding='VALID', scope='conv_2')
             net = slim.max_pool2d(net, 2, padding='SAME', scope='pool_3')

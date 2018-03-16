@@ -1,11 +1,19 @@
+img_w = 448
+img_h = 448
+batch_size = 5
+C = 80
+
 # convolutional
-img_w_conv = 448
-img_h_conv = 448
 label_w_conv = 14
 label_h_conv = 14
-batch_size_conv = 10
 
-C = 80
+# autoencoder
+label_w_ae = 448
+label_h_ae = 448
+
+# variational autoencoder
+label_w_vae = 448
+label_h_vae = 448
 
 id_to_class = {1: 'person', 2: 'bicycle', 3: 'car', 4: 'motorcycle', 5: 'airplane', 6: 'bus', 7: 'train', 8: 'truck',
                9: 'boat', 10: 'traffic light', 11: 'fire hydrant', 13: 'stop sign', 14: 'parking meter', 15: 'bench',
