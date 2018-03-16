@@ -10,14 +10,8 @@ def pretrained_encoder(input_placeholder):
     Returns pretrained convolutional encoder. It was trained on IMAGENET
     """
 
-    def leaky_relu(alpha):
-        def op(inputs):
-            return tf.maximum(alpha * inputs, inputs)
-
-        return op
-
     with tf.variable_scope('yolo'):
-        with slim.arg_scope([slim.conv2d], activation_fn=leaky_relu(0.1),
+        with slim.arg_scope([slim.conv2d], activation_fn=tf.nn.elu,
                             weights_initializer=tf.truncated_normal_initializer(0.0, 0.01),
                             weights_regularizer=slim.l2_regularizer(0.0005)):
             # hack to make TF work - DatasetAPI somehow doesn't pass number of channels

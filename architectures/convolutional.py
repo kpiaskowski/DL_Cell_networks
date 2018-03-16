@@ -127,6 +127,7 @@ def convolutional_model(input_placeholder):
         # (batch_size, 16, 16, 512)
         net = tf.layers.conv2d(net,
                                filters=512,
+                               padding='SAME',
                                kernel_size=(3, 3),
                                kernel_initializer=tf.contrib.layers.xavier_initializer(),
                                activation=tf.nn.leaky_relu)
@@ -144,14 +145,8 @@ def convolutional_model(input_placeholder):
                                activation=tf.nn.leaky_relu)
         # (batch_size, 14, 14, 128)
         net = tf.layers.conv2d(net,
-                               filters=128,
-                               kernel_size=(1, 1),
-                               kernel_initializer=tf.contrib.layers.xavier_initializer(),
-                               activation=tf.nn.leaky_relu)
-        # (batch_size, 14, 14, 80)
-        net = tf.layers.conv2d(net,
                                filters=C,
                                kernel_size=(1, 1),
                                kernel_initializer=tf.contrib.layers.xavier_initializer(),
-                               activation=None)
+                               activation=tf.nn.leaky_relu)
         return net

@@ -81,25 +81,25 @@ def calc_time_left(mean_time, left_samples_n):
     return '{:3d}h{:3d}m{:3d}s'.format(h, m, s)
 
 
-parser = argparse.ArgumentParser(description='Prepares labels')
-parser.add_argument('--annotations_path ', help='path to FILE with annotations - that is the one with JSON extension', dest='annotations_path')
-parser.add_argument('--labels_path', help='path to folder, where labels should be placed - it will be created automatically if not present yet',
-                    dest='labels_path')
-parser.add_argument('--dst_w', help='width of generated labels', dest='dst_w')
-parser.add_argument('--dst_h', help='height of generated labels', dest='dst_h')
-
-args = parser.parse_args()
-
-annotations_path = args.annotations_path
-labels_path = args.labels_path
-dst_w = args.dst_w
-dst_h = args.dst_h
-
-if any((i is None for i in (annotations_path, labels_path, dst_h, dst_w))):
-    raise Exception('Provide all parameters (images_path, annotations_path, labels_path, dst_h, dst_w)!')
-
-create_mask_dirs(labels_path)
-create_masks(annotations_path, labels_path, int(dst_w), int(dst_h))
+# parser = argparse.ArgumentParser(description='Prepares labels')
+# parser.add_argument('--annotations_path ', help='path to FILE with annotations - that is the one with JSON extension', dest='annotations_path')
+# parser.add_argument('--labels_path', help='path to folder, where labels should be placed - it will be created automatically if not present yet',
+#                     dest='labels_path')
+# parser.add_argument('--dst_w', help='width of generated labels', dest='dst_w')
+# parser.add_argument('--dst_h', help='height of generated labels', dest='dst_h')
+#
+# args = parser.parse_args()
+#
+# annotations_path = args.annotations_path
+# labels_path = args.labels_path
+# dst_w = args.dst_w
+# dst_h = args.dst_h
+#
+# if any((i is None for i in (annotations_path, labels_path, dst_h, dst_w))):
+#     raise Exception('Provide all parameters (images_path, annotations_path, labels_path, dst_h, dst_w)!')
+#
+# create_mask_dirs(labels_path)
+# create_masks(annotations_path, labels_path, int(dst_w), int(dst_h))
 
 # quick help
 # train_annotations = 'data/annotations/instances_train2017.json'
