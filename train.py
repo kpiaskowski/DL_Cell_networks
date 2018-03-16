@@ -55,12 +55,13 @@ with tf.Session() as sess:
     train_writer = tf.summary.FileWriter(os.path.join('saved_summaries', model_name, 'train'), sess.graph)
     val_writer = tf.summary.FileWriter(os.path.join('saved_summaries', model_name, 'validation'))
     sess.run(tf.global_variables_initializer())
-    saver_encoder.restore(sess, 'pretrained_imagenet/pretrained_imagenet.ckpt')  # load pretrained encoder
 
     if len(os.listdir(os.path.join('saved_models', model_name))) > 0:
-        saver_decoder.restore(sess, os.path.join('saved_models', model_name, 'model.ckpt'))
+        saver_decoder.restore(sess, os.path.join('saved_models', model_name, 'd_model.ckpt'))
+        saver_encoder.restore(sess, os.path.join('saved_models', model_name, 'e_model.ckpt'))
         print(model_name + ' loaded')
     else:
+        saver_encoder.restore(sess, 'pretrained_imagenet/pretrained_imagenet.ckpt')  # load encoder pretrained on imagenet
         print('Training %s from scratch' % model_name)
 
     for epoch in range(epochs):
@@ -77,7 +78,7 @@ with tf.Session() as sess:
                     mask = masks[i]
                     img = imgs[i]
                     gt_mask = gt_masks[i]
-                    filepath = os.path.join('generated_images', model_name, 'e_' + str(epoch + 1) + '_' + str(k + 1) + '_i_' + str(i) + '_train.jpg')
+                    filepath = os.path.join('generated_images', model_name, '_e_' + str(epoch + 1) + 'k_' + str(k + 1) + '_i_' + str(i) + '_train.jpg')
                     debug_and_save_imgs(img, mask, gt_mask, thresh, filepath)
 
         saver_decoder.save(sess, os.path.join('saved_models', model_name, 'd_model.ckpt'))
@@ -97,6 +98,6 @@ with tf.Session() as sess:
                     mask = masks[i]
                     img = imgs[i]
                     gt_mask = gt_masks[i]
-                    filepath = os.path.join('generated_images', model_name, 'e_' + str(epoch + 1) + '_' + str(k + 1) + '_i_' + str(i) + '_val.jpg')
+                    filepath = os.path.join('generated_images', model_name, '_e_' + str(epoch + 1) + 'k_' + str(k + 1) + '_i_' + str(i) + '_val.jpg')
                     debug_and_save_imgs(img, mask, gt_mask, thresh, filepath)
         print()
