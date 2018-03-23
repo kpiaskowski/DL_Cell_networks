@@ -66,12 +66,12 @@ class DataProvider:
         val_image_names = tf.constant(sorted(os.path.join(v_img_path, name) for name in os.listdir(v_img_path)))
 
         training_dataset = tf.data.Dataset.from_tensor_slices((train_image_names, train_label_names))
-        training_dataset = training_dataset.shuffle(buffer_size=10000)
+        training_dataset = training_dataset.shuffle(buffer_size=20000)
         training_dataset = training_dataset.map(self.dataset_resize_images, num_parallel_calls=4)
         training_dataset = training_dataset.map(
             lambda filename, label: tuple(tf.py_func(self.dataset_convert_labels, [filename, label], [tf.float32, tf.float32], stateful=False)),
             num_parallel_calls=4)
-        training_dataset = training_dataset.prefetch(batch_size * 10)
+        training_dataset = training_dataset.prefetch(batch_size)
         training_dataset = training_dataset.batch(batch_size)
 
         val_dataset = tf.data.Dataset.from_tensor_slices((val_image_names, val_label_names))
@@ -79,6 +79,7 @@ class DataProvider:
         val_dataset = val_dataset.map(self.dataset_resize_images)
         val_dataset = val_dataset.map(
             lambda filename, label: tuple(tf.py_func(self.dataset_convert_labels, [filename, label], [tf.float32, tf.float32], stateful=False)))
+        val_dataset = val_dataset.prefetch(batch_size)
         val_dataset = val_dataset.batch(batch_size)
 
         iterator = tf.data.Iterator.from_structure(training_dataset.output_types, training_dataset.output_shapes)

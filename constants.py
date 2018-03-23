@@ -8,8 +8,8 @@ label_w_conv = 14
 label_h_conv = 14
 
 # autoencoder
-label_w_ae = 448
-label_h_ae = 448
+label_w_ae = 256
+label_h_ae = 256
 
 # variational autoencoder
 label_w_vae = 448
