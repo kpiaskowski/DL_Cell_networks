@@ -80,6 +80,47 @@ def compute_bboxes(mask):
     return dict(continuous_id_boxes)
 
 
+def draw_tensorboard_predictions(img, mask):
+    """
+    This is simplified version of draw_predictions, made only for speed issues for tensorboard. I got rid of GPU slowering ifs and mask showing.
+    """
+    # get only 1st values from batch
+    img = img[0]
+    mask = mask[0]
+
+    img_w = img.shape[1]
+    img_h = img.shape[0]
+    label_w = mask.shape[1]
+    label_h = mask.shape[0]
+    w_step = img_w / label_w
+    h_step = img_h / label_h
+
+    new_img = np.copy(img)
+
+    boxes = compute_bboxes(mask)
+    for k, v in boxes.items():
+        for box in v:
+            new_img = cv2.rectangle(new_img,
+                                    (int(box[0] * w_step), int(box[1] * h_step)),
+                                    (int((box[0] + box[2]) * w_step), int((box[1] + box[3]) * h_step)),
+                                    color=colors[k],
+                                    thickness=2)
+            (text_w, text_h), _ = cv2.getTextSize(id_to_class[contid_to_COCOid[k]], cv2.FONT_HERSHEY_COMPLEX, 1, 1)
+            new_img = cv2.rectangle(new_img,
+                                    (int(box[0] * w_step), int(box[1] * h_step)),
+                                    (int(box[0] * w_step) + text_w + 5, int(box[1] * h_step) + text_h + 5),
+                                    color=(1, 1, 1),
+                                    thickness=-1)
+            new_img = cv2.putText(new_img,
+                                  id_to_class[contid_to_COCOid[k]],
+                                  (int(box[0] * w_step), int(box[1] * h_step) + 10),
+                                  cv2.FONT_HERSHEY_COMPLEX,
+                                  fontScale=1,
+                                  color=(0, 0, 0))
+
+    return new_img
+
+
 def draw_predictions(img, mask, show_mask=True, show_boxes=True):
     """
     Draws prediction on image. Resizes mask automatically in order to match img size.
@@ -90,6 +131,9 @@ def draw_predictions(img, mask, show_mask=True, show_boxes=True):
     :param show_boxes: True if bounding boxes should be drawn
     :return: Img with drawn objects
     """
+    # get only 1st values from batch
+    img = img[0]
+    mask = mask[0]
 
     img_w = img.shape[1]
     img_h = img.shape[0]
@@ -123,7 +167,7 @@ def draw_predictions(img, mask, show_mask=True, show_boxes=True):
                                         (int((box[0] + box[2]) * w_step), int((box[1] + box[3]) * h_step)),
                                         color=colors[k],
                                         thickness=2)
-                (text_w, text_h), _ = cv2.getTextSize(id_to_class[contid_to_COCOid[k]], cv2.FONT_HERSHEY_COMPLEX, 0.5, 1)
+                (text_w, text_h), _ = cv2.getTextSize(id_to_class[contid_to_COCOid[k]], cv2.FONT_HERSHEY_COMPLEX, 1, 1)
                 new_img = cv2.rectangle(new_img,
                                         (int(box[0] * w_step), int(box[1] * h_step)),
                                         (int(box[0] * w_step) + text_w + 5, int(box[1] * h_step) + text_h + 5),
@@ -133,7 +177,7 @@ def draw_predictions(img, mask, show_mask=True, show_boxes=True):
                                       id_to_class[contid_to_COCOid[k]],
                                       (int(box[0] * w_step), int(box[1] * h_step) + 10),
                                       cv2.FONT_HERSHEY_COMPLEX,
-                                      fontScale=0.5,
+                                      fontScale=1,
                                       color=(0, 0, 0))
 
     return new_img
@@ -182,6 +226,7 @@ def create_training_dirs(save_path, summary_path, generated_imgs, model_name):
         os.mkdir(os.path.join(save_path, model_name))
     if not os.path.isdir(os.path.join(generated_imgs, model_name)):
         os.mkdir(os.path.join(generated_imgs, model_name))
+
 
 def debug_and_save_imgs(image, mask, gt_mask, thresh, filepath):
     """

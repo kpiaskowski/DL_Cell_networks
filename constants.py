@@ -1,6 +1,5 @@
 img_w = 448
 img_h = 448
-batch_size = 5
 C = 80
 
 # convolutional

@@ -18,15 +18,13 @@ run with no harm on reasonable younger/older versions)
 ### Running steps
 1. 
     Create folder named 'data'. In order to get anything done, you first need to downloaded COCO data from here: http://cocodataset.org/#download . Download:
-    - 2017 Train images
-    - 2017 Val images
-    - 2017 Test images
-    - 2017 Train/Val annotations
+    - 2017 Train images (wget http://images.cocodataset.org/zips/train2017.zip)
+    - 2017 Val images (wget http://images.cocodataset.org/zips/val2017.zip)
+    - 2017 Train/Val annotations (wget http://images.cocodataset.org/annotations/annotations_trainval2017.zip)
     
-    Extract these 4 files and put their content into previously created 'data' folder. Your project tree should look like this (most folders not shown for brewity):
+    Extract these 3 files and put their content into previously created 'data' folder. Your project tree should look like this (most folders not shown for brewity):
     - data
         - annotations
-        - test2017
         - train2017
         - val2017
     
