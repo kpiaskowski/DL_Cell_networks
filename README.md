@@ -44,5 +44,3 @@ run with no harm on reasonable younger/older versions)
     
     Example of usage:
     - python prepare.py --dst_w=14 --dst_h=14 --annotations_path=data/annotations/instances_val2017.json --labels_path=data/labels_S14
-     
-

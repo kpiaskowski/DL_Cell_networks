@@ -24,4 +24,4 @@ def conv_decoder(encoder_output):
                                kernel_initializer=tf.contrib.layers.xavier_initializer(),
                                kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=0.0005),
                                activation=None)
-        return net, namescope
+        return net

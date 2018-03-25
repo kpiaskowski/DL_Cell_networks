@@ -61,7 +61,6 @@ class DataProvider:
         """
         Creates dataset init ops
         """
-
         train_label_names = tf.constant(sorted(os.path.join(t_label_path, name) for name in os.listdir(t_label_path)))
         val_label_names = tf.constant(sorted(os.path.join(v_label_path, name) for name in os.listdir(v_label_path)))
         train_image_names = tf.constant(sorted(os.path.join(t_img_path, name) for name in os.listdir(t_img_path)))
@@ -75,20 +74,23 @@ class DataProvider:
             num_parallel_calls=4)
         training_dataset = training_dataset.prefetch(self.batch_size)
         training_dataset = training_dataset.batch(self.batch_size)
+        training_dataset = training_dataset.repeat()
 
         val_dataset = tf.data.Dataset.from_tensor_slices((val_image_names, val_label_names))
-        val_dataset = val_dataset.shuffle(buffer_size=500)
+        val_dataset = val_dataset.shuffle(buffer_size=5000)
         val_dataset = val_dataset.map(self.dataset_resize_images, num_parallel_calls=4)
         val_dataset = val_dataset.map(
             lambda filename, label: tuple(tf.py_func(self.dataset_convert_labels, [filename, label], [tf.float32, tf.float32], stateful=False)),
             num_parallel_calls=4)
         val_dataset = val_dataset.prefetch(self.batch_size)
         val_dataset = val_dataset.batch(self.batch_size)
+        val_dataset = val_dataset.repeat()
 
-        iterator = tf.data.Iterator.from_structure(training_dataset.output_types, training_dataset.output_shapes)
+        handle = tf.placeholder(tf.string, shape=[])
+        iterator = tf.data.Iterator.from_string_handle(handle, training_dataset.output_types, training_dataset.output_shapes)
         images, labels = iterator.get_next()
 
-        training_dataset_init = iterator.make_initializer(training_dataset)
-        validation_dataset_init = iterator.make_initializer(val_dataset)
+        training_iterator = training_dataset.make_one_shot_iterator()
+        validation_iterator = val_dataset.make_one_shot_iterator()
 
-        return training_dataset_init, validation_dataset_init, images, labels
+        return handle, training_iterator, validation_iterator, images, labels
