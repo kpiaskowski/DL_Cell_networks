@@ -212,7 +212,7 @@ def create_mask_dirs(directory):
         os.mkdir(directory)
 
 
-def create_training_dirs(save_path, summary_path, generated_imgs, model_name):
+def create_training_dirs(save_path, summary_path, model_name):
     """
     Creates directories for saving models and summaries
     """
@@ -220,12 +220,8 @@ def create_training_dirs(save_path, summary_path, generated_imgs, model_name):
         os.mkdir(save_path)
     if not os.path.isdir(summary_path):
         os.mkdir(summary_path)
-    if not os.path.isdir(generated_imgs):
-        os.mkdir(generated_imgs)
     if not os.path.isdir(os.path.join(save_path, model_name)):
         os.mkdir(os.path.join(save_path, model_name))
-    if not os.path.isdir(os.path.join(generated_imgs, model_name)):
-        os.mkdir(os.path.join(generated_imgs, model_name))
 
 
 def debug_and_save_imgs(image, mask, gt_mask, thresh, filepath):

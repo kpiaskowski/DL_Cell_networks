@@ -13,7 +13,7 @@ from utils import create_training_dirs, draw_tensorboard_predictions
 epochs = 100
 l_rate = 0.00001
 thresh = 0.3
-batch_size = 2
+batch_size = 20
 model_name = 'vae_model_S256'
 logging_checkpoint = 20
 latent_units = 200
@@ -46,7 +46,7 @@ loss = tf.reduce_mean(generative_loss + latent_loss)
 train_op = tf.train.AdamOptimizer(l_rate).minimize(loss)
 
 # saving and logging
-create_training_dirs('saved_models', 'saved_summaries', 'generated_images', model_name)
+create_training_dirs('saved_models', 'saved_summaries', model_name)
 saver = tf.train.Saver(max_to_keep=10, keep_checkpoint_every_n_hours=3)
 pretrained_loader = tf.train.Saver(var_list=tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='yolo'))
 
