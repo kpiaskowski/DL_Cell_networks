@@ -1,6 +1,7 @@
 import json
 import os
 
+import cv2
 import numpy as np
 import tensorflow as tf
 from architectures.conv_decoder import conv_decoder
@@ -45,7 +46,7 @@ with tf.Session() as sess:
             mask = np.copy(predictions)
             mask[mask >= thresh] = 1
             mask[mask < thresh] = 0
-            labelled_img, boxes = draw_predictions(image, mask, False, False)
+            labelled_img, boxes = draw_predictions(image, mask, False, True)
             scores = compute_coco_annotations(boxes, predictions[0], w, h, contid_to_COCOid, label_size)
             for k, boxes in scores.items():
                 for box in boxes:

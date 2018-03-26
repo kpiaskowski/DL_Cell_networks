@@ -1,5 +1,6 @@
-import os
 import json
+import os
+
 import cv2
 import numpy as np
 
@@ -8,6 +9,7 @@ from constants import C, colors, id_to_class
 # COCO classes aren't indexed from zero and there are leaps between indices higher than 1
 contid_to_COCOid = dict(zip(range(len(id_to_class.keys())), id_to_class.keys()))
 COCOid_to_contid = dict(zip(id_to_class.keys(), range(len(id_to_class.keys()))))
+
 
 def valid_filenames(info_path, folder_path):
     """
@@ -20,6 +22,7 @@ def valid_filenames(info_path, folder_path):
     for i, entry in enumerate(dataset['images']):
         name_dict[folder_path + '/' + entry['file_name']] = {'id': entry['id'], 'height': entry['height'], 'width': entry['width']}
     return name_dict, list(name_dict.keys())
+
 
 def create_full_mask(org_w, org_h, annotations):
     """
@@ -77,7 +80,7 @@ def resize_mask(org_mask, dst_w, dst_h):
     return stacked_planes
 
 
-def compute_bboxes(mask):
+def compute_bboxes(mask, min_area=1):
     """
     Converts mask tensor into dict of bdboxes
     :param mask: tensor of predictions of shape
@@ -86,7 +89,7 @@ def compute_bboxes(mask):
     """
     mask_planes = [mask[:, :, i] for i in range(C)]
     contours = [cv2.findContours(plane.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[1] for plane in mask_planes]
-    coords = [[cv2.boundingRect(cnt) for cnt in contour] for contour in contours]
+    coords = [[cv2.boundingRect(cnt) for cnt in contour if cv2.contourArea(cnt) > min_area] for contour in contours]
     continuous_id_boxes = [[i, xywh] for i, xywh in enumerate(coords) if xywh]
     return dict(continuous_id_boxes)
 
@@ -215,7 +218,7 @@ def calc_pred_size(mean_size, n_samples):
     """
     Calculates predicted size of dataset. Requires mean size of single sample in bytes
     """
-    size = int(mean_size * n_samples / (2 ** 20))
+    size = int(mean_size.value * n_samples / (2 ** 20))
     gigabytes = size // 1024
     megabytes = (size - gigabytes * 1024)
     return '{:d} GB {:d} MB'.format(gigabytes, megabytes)
@@ -225,7 +228,7 @@ def calc_time_left(mean_time, left_samples_n):
     """
     Computes formatted left time of any operation, given mean time of single operation and left number of samples
     """
-    time_left = int(mean_time * left_samples_n)
+    time_left = int(mean_time.value * left_samples_n)
     h = time_left // 3660
     m = (time_left - h * 3600) // 60
     s = (time_left - h * 3600 - m * 60)

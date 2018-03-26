@@ -1,34 +1,23 @@
 import argparse
 import json
+import multiprocessing as mp
 import os
 import time
+from multiprocessing import Value
 
 import numpy as np
+import psutil
 
 from utils import collect_annotations, create_full_mask, resize_mask, create_mask_dirs, calc_time_left, calc_pred_size
 
 
-def create_masks(annotations_path, dst_dir, dst_w, dst_h):
-    """
-    Creates masks for images. Masks are of the same size as images
-    :param annotations_path: path to annotations file
-    :param images: path to images dir
-    :param dst_dir: destination to put masks
-    :param dst_w: destination mask width
-    :param dst_h: destination mask height
-    """
-    dataset = json.load(open(annotations_path, 'r'))
-    annotations_list = dataset['annotations']
-    images = dataset['images']
-
-    mean_time = 0
-    mean_size = 0
-    data_len = len(images)
+def process_labels(data_len, step, mean_time, mean_size, annotations_list, images, dst_dir, dst_w, dst_h, num_processes):
     for i, img_desc in enumerate(images):
+        step.value += 1
         print('\rSaving masked labels: {} of {}, time left: {}, predicted size: {}'
-              .format(i + 1,
+              .format(step.value + 1,
                       data_len,
-                      calc_time_left(mean_time, data_len - i),
+                      calc_time_left(mean_time, data_len - step.value),
                       calc_pred_size(mean_size, data_len)),
               end='', flush=True)
 
@@ -48,8 +37,68 @@ def create_masks(annotations_path, dst_dir, dst_w, dst_h):
         np.savez(os.path.join(dst_dir, mask_name), resized, non_zero_ids)
 
         e = time.time()
-        mean_time = i / (i + 1) * mean_time + (e - s) / (i + 1)
-        mean_size = i / (i + 1) * mean_size + resized.nbytes / (i + 1)
+        mean_time.value = i / (i + 1) * mean_time.value + (e - s) / (i + 1) / num_processes
+        mean_size.value = i / (i + 1) * mean_size.value + resized.nbytes / (i + 1)
+
+
+def create_masks(annotations_path, dst_dir, dst_w, dst_h):
+    """
+    Creates masks for images. Masks are of the same size as images
+    :param annotations_path: path to annotations file
+    :param images: path to images dir
+    :param dst_dir: destination to put masks
+    :param dst_w: destination mask width
+    :param dst_h: destination mask height
+    """
+    dataset = json.load(open(annotations_path, 'r'))
+    annotations_list = dataset['annotations']
+    images = dataset['images']
+
+    num_processes = psutil.cpu_count()
+    data_len = len(images)
+    divider = data_len / num_processes
+
+    images = [images[int(i * divider): int((i + 1) * divider)] for i in range(num_processes)]
+
+    step = Value('i', 0)
+    mean_time = Value('f', 0)
+    mean_size = Value('f', 0)
+
+    def process_labels(images):
+        for i, img_desc in enumerate(images):
+            step.value += 1
+            print('\rSaving masked labels: {} of {}, time left: {}, predicted size: {}'
+                  .format(step.value,
+                          data_len,
+                          calc_time_left(mean_time, data_len - step.value),
+                          calc_pred_size(mean_size, data_len)),
+                  end='', flush=True)
+
+            s = time.time()
+            img_id = img_desc['id']
+            img_w = img_desc['width']
+            img_h = img_desc['height']
+            img_annotations = collect_annotations(img_id, annotations_list)
+            mask = create_full_mask(img_w, img_h, img_annotations)
+
+            resized = resize_mask(mask, dst_w, dst_h)
+            non_zero_ids = np.count_nonzero(resized, axis=(0, 1))
+            non_zero_ids = np.nonzero(non_zero_ids)[0]
+            resized = resized[:, :, non_zero_ids]
+
+            mask_name = img_desc['file_name'].replace('jpg', 'npz')
+            np.savez(os.path.join(dst_dir, mask_name), resized, non_zero_ids)
+
+            e = time.time()
+            mean_time.value = i / (i + 1) * mean_time.value + (e - s) / (i + 1) / num_processes
+            mean_size.value = i / (i + 1) * mean_size.value + resized.nbytes / (i + 1)
+
+    processes = [mp.Process(target=process_labels, args=([images[i]])) for i in range(num_processes)]
+    for p in processes:
+        p.start()
+
+    for p in processes:
+        p.join()
 
 
 if __name__ == '__main__':
