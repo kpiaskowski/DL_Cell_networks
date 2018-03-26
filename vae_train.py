@@ -6,7 +6,7 @@ from architectures.pretrained_encoder import pretrained_encoder as encoder
 from architectures.variational_autoencoder import vae_decoder
 
 from constants import img_w, img_h
-from dataprovider import DataProvider
+from dataprovider_train import DataProvider
 from utils import create_training_dirs, draw_tensorboard_predictions
 
 # experiment params

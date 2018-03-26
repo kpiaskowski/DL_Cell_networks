@@ -1,5 +1,5 @@
 import os
-
+import json
 import cv2
 import numpy as np
 
@@ -9,6 +9,17 @@ from constants import C, colors, id_to_class
 contid_to_COCOid = dict(zip(range(len(id_to_class.keys())), id_to_class.keys()))
 COCOid_to_contid = dict(zip(id_to_class.keys(), range(len(id_to_class.keys()))))
 
+def valid_filenames(info_path, folder_path):
+    """
+    Attention! test-dev is a subset of test!!!
+    Gathers valid imagenames for test_dev or test_challege (depends on annotations path)
+    :return:
+    """
+    name_dict = {}
+    dataset = json.load(open(info_path, 'r'))
+    for i, entry in enumerate(dataset['images']):
+        name_dict[folder_path + '/' + entry['file_name']] = {'id': entry['id'], 'height': entry['height'], 'width': entry['width']}
+    return name_dict, list(name_dict.keys())
 
 def create_full_mask(org_w, org_h, annotations):
     """
@@ -121,6 +132,23 @@ def draw_tensorboard_predictions(img, mask):
     return new_img
 
 
+def compute_coco_annotations(boxes, mask, org_img_w, org_img_h, contid_to_cocoid, label_size):
+    """
+    Computes trivial score and recalculates xywh to match coco standards. Also recomputes class
+    """
+    scored_boxes = {}
+    for k, v in boxes.items():
+        scored_boxes[contid_to_cocoid[k]] = []
+        for box in v:
+            x = float(box[0] / label_size * org_img_w)
+            w = float(box[2] / label_size * org_img_w)
+            y = float(box[1] / label_size * org_img_h)
+            h = float(box[3] / label_size * org_img_h)
+            score = np.mean(mask[box[1]:box[1] + box[3], box[0]:box[0] + box[2], k])
+            scored_boxes[contid_to_cocoid[k]].append([x, y, w, h, float(score)])
+    return scored_boxes
+
+
 def draw_predictions(img, mask, show_mask=True, show_boxes=True):
     """
     Draws prediction on image. Resizes mask automatically in order to match img size.
@@ -141,6 +169,7 @@ def draw_predictions(img, mask, show_mask=True, show_boxes=True):
     label_h = mask.shape[0]
     w_step = img_w / label_w
     h_step = img_h / label_h
+    boxes = compute_bboxes(mask)
 
     new_img = np.copy(img)
     if show_mask:
@@ -159,7 +188,6 @@ def draw_predictions(img, mask, show_mask=True, show_boxes=True):
         new_img = cv2.addWeighted(new_img, 0.6, output_color_mask, 1, 0)
 
     if show_boxes:
-        boxes = compute_bboxes(mask)
         for k, v in boxes.items():
             for box in v:
                 new_img = cv2.rectangle(new_img,
@@ -180,7 +208,7 @@ def draw_predictions(img, mask, show_mask=True, show_boxes=True):
                                       fontScale=1,
                                       color=(0, 0, 0))
 
-    return new_img
+    return new_img, boxes
 
 
 def calc_pred_size(mean_size, n_samples):
