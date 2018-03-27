@@ -56,8 +56,8 @@ with tf.Session() as sess:
                         'bbox': box[:4],
                         'score': box[-1]
                     })
-            # cv2.imshow('', labelled_img)
-            # cv2.waitKey(2000)
+            cv2.imshow('', labelled_img)
+            cv2.waitKey(2000)
             print('Processing image {} of {}'.format(i + 1, len(filenames)))
             i += 1
         except tf.errors.OutOfRangeError:

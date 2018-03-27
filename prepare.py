@@ -11,36 +11,6 @@ import psutil
 from utils import collect_annotations, create_full_mask, resize_mask, create_mask_dirs, calc_time_left, calc_pred_size
 
 
-def process_labels(data_len, step, mean_time, mean_size, annotations_list, images, dst_dir, dst_w, dst_h, num_processes):
-    for i, img_desc in enumerate(images):
-        step.value += 1
-        print('\rSaving masked labels: {} of {}, time left: {}, predicted size: {}'
-              .format(step.value + 1,
-                      data_len,
-                      calc_time_left(mean_time, data_len - step.value),
-                      calc_pred_size(mean_size, data_len)),
-              end='', flush=True)
-
-        s = time.time()
-        img_id = img_desc['id']
-        img_w = img_desc['width']
-        img_h = img_desc['height']
-        img_annotations = collect_annotations(img_id, annotations_list)
-        mask = create_full_mask(img_w, img_h, img_annotations)
-
-        resized = resize_mask(mask, dst_w, dst_h)
-        non_zero_ids = np.count_nonzero(resized, axis=(0, 1))
-        non_zero_ids = np.nonzero(non_zero_ids)[0]
-        resized = resized[:, :, non_zero_ids]
-
-        mask_name = img_desc['file_name'].replace('jpg', 'npz')
-        np.savez(os.path.join(dst_dir, mask_name), resized, non_zero_ids)
-
-        e = time.time()
-        mean_time.value = i / (i + 1) * mean_time.value + (e - s) / (i + 1) / num_processes
-        mean_size.value = i / (i + 1) * mean_size.value + resized.nbytes / (i + 1)
-
-
 def create_masks(annotations_path, dst_dir, dst_w, dst_h):
     """
     Creates masks for images. Masks are of the same size as images
