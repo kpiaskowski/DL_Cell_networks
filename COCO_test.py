@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 
@@ -10,7 +11,6 @@ from architectures.pretrained_encoder import pretrained_encoder as encoder
 from constants import label_w as label_size
 from dataprovider_inference import DataProvider
 from utils import draw_predictions, valid_filenames, compute_coco_annotations, contid_to_COCOid
-import argparse
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Tests on COCO')

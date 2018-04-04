@@ -1,9 +1,10 @@
+import argparse
 import os
 
-import argparse
 import tensorflow as tf
 from architectures.conv_decoder import conv_decoder
 from architectures.pretrained_encoder import pretrained_encoder as encoder
+
 from constants import img_w, img_h
 from dataprovider_train import DataProvider
 from utils import create_training_dirs, draw_tensorboard_predictions
