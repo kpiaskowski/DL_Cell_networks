@@ -42,7 +42,7 @@ class DataProvider:
         dataset = dataset.prefetch(self.batch_size)
         dataset = dataset.batch(self.batch_size)
 
-        iterator = dataset.make_one_shot_iterator()
+        iterator = dataset.make_initializable_iterator()
         image, name = iterator.get_next()
 
-        return image, name
+        return image, name, iterator

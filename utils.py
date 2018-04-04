@@ -208,7 +208,7 @@ def draw_predictions(img, mask, show_mask=True, show_boxes=True):
                                       id_to_class[contid_to_COCOid[k]],
                                       (int(box[0] * w_step), int(box[1] * h_step) + 10),
                                       cv2.FONT_HERSHEY_COMPLEX,
-                                      fontScale=1,
+                                      fontScale=0.5,
                                       color=(0, 0, 0))
 
     return new_img, boxes

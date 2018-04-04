@@ -7,7 +7,7 @@ import tensorflow as tf
 from architectures.conv_decoder import conv_decoder
 from architectures.pretrained_encoder import pretrained_encoder as encoder
 
-from constants import label_w_conv as label_size
+from constants import label_w as label_size
 from dataprovider_inference import DataProvider
 from utils import draw_predictions, valid_filenames, compute_coco_annotations, contid_to_COCOid
 
@@ -22,7 +22,7 @@ name_dict, filenames = valid_filenames(annotations_path, data_path)
 
 # datasets
 dataset = DataProvider(filenames)
-images, names = dataset.get_data()
+images, names, iterator = dataset.get_data()
 
 # model
 encoder = encoder(images)
@@ -38,14 +38,21 @@ with tf.Session() as sess:
     loader.restore(sess, os.path.join('saved_models', model_name, 'model.ckpt-' + model_checkpoint))
 
     i = 0
+    sess.run(iterator.initializer)
     while True:
+        if i != 2:
+            sess.run([output, images, names])
+            i += 1
+            continue
         try:
             predictions, image, name = sess.run([output, images, names])  # since we are using only batchsize = 1
             id, w, h = name_dict[name[0].decode()]['id'], name_dict[name[0].decode()]['height'], name_dict[name[0].decode()]['width']
 
             mask = np.copy(predictions)
+
             mask[mask >= thresh] = 1
             mask[mask < thresh] = 0
+
             labelled_img, boxes = draw_predictions(image, mask, False, True)
             scores = compute_coco_annotations(boxes, predictions[0], w, h, contid_to_COCOid, label_size)
             for k, boxes in scores.items():
@@ -57,7 +64,7 @@ with tf.Session() as sess:
                         'score': box[-1]
                     })
             cv2.imshow('', labelled_img)
-            cv2.waitKey(2000)
+            cv2.waitKey(-1)
             print('Processing image {} of {}'.format(i + 1, len(filenames)))
             i += 1
         except tf.errors.OutOfRangeError:
