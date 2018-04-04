@@ -23,7 +23,7 @@ Too small contours are rejected as false positives. If the objects of
 single class are too crowded, the bounding boxing algorithm treats them as
 single objects - that's a flaw I am working on. 
 
-One picture is worth a thousand words, so let's see this process on images.
+**One picture is worth a thousand words, so let's see this process on images.**
 
 1. Original image.
 
@@ -84,9 +84,9 @@ run with no harm on reasonable younger/older versions)
     YOU SHOULD GENERATE TRAIN AND VALIDATION SETS INDEPENDENTLY! Don't do anything with test data.
     Generally I used S = dst_w = dst_h. In case of generating training data, be prepared to very long wait - it tooks 5 hours on my laptop.
     
-    Example of usage (the network is compatible with these params):
+    **Example of usage (the network is compatible with these params):
     - python prepare.py --dst_w=14 --dst_h=14 --annotations_path=data/annotations/instances_val2017.json --labels_path=data/val_labels_S14
-    - python prepare.py --dst_w=14 --dst_h=14 --annotations_path=data/annotations/instances_train2017.json --labels_path=data/train_labels_S14
+    - python prepare.py --dst_w=14 --dst_h=14 --annotations_path=data/annotations/instances_train2017.json --labels_path=data/train_labels_S14**
     
     Ok, enough preprocessing, let's train it!
     
@@ -104,8 +104,8 @@ run with no harm on reasonable younger/older versions)
    
    It will train your network and, log progress and metrics into saved_summaries/model_name and save every n iterations into saved_models/model_name
    
-   Example of usage: 
-   python train.py --model_name=my_model --epochs=100 --l_rate=0.00001 --thresh=0.3 --batch_size=10 --saver_checkpoint=15 --t_img_path=data/train2017 --v_img_path=data/val2017 --t_label_path=data/train_labels_S14 --v_label_path=data/val_labels_S14
+   **Example of usage: 
+   python train.py --model_name=my_model --epochs=100 --l_rate=0.00001 --thresh=0.3 --batch_size=10 --saver_checkpoint=15 --t_img_path=data/train2017 --v_img_path=data/val2017 --t_label_path=data/train_labels_S14 --v_label_path=data/val_labels_S14**
 
    If you want to continue training from previously train model, apart from aforementioned params,
    you should also provide checkpoint number:
@@ -120,8 +120,8 @@ run with no harm on reasonable younger/older versions)
    If you want to run model pretrained on COCO, download it from here:
    https://drive.google.com/open?id=1_uECl9HKH-Bps6QTcPGa6rn21y97l7pP, extract and put into 'saved_models'.
    
-   Example of usage:
-   python test.py --model_name=model_s14 --model_checkpoint=62695 --thresh=0.3
+   **Example of usage:
+   python test.py --model_name=model_s14 --model_checkpoint=62695 --thresh=0.3**
    
 6. If you want to test your model on COCO dataset, first you need to generate COCO file with COCO_test.py with params;
    - model_name (name of model)  
@@ -132,7 +132,7 @@ run with no harm on reasonable younger/older versions)
    - show_images (wheter show or not images, rather for debugging purpose, values t/f)
    
    Example of usage:
-   python COCO_test.py --model_name=model_s14 --model_checkpoint=62695 --data_path=data/test2017 --annotations_path=data/test_annotations/image_info_test-dev2017.json --thresh=0.3 --show_images=t
+   **python COCO_test.py --model_name=model_s14 --model_checkpoint=62695 --data_path=data/test2017 --annotations_path=data/test_annotations/image_info_test-dev2017.json --thresh=0.3 --show_images=t**
 
       
     
