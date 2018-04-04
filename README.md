@@ -48,18 +48,22 @@ run with no harm on reasonable younger/older versions)
 - numpy 1.14.1
 - opencv 3.3.0
 
-### Running steps
+### How to run it?
 1. 
     Create folder named 'data'. In order to get anything done, you first need to downloaded COCO data from here: http://cocodataset.org/#download . Download:
     - 2017 Train images (wget http://images.cocodataset.org/zips/train2017.zip)
     - 2017 Val images (wget http://images.cocodataset.org/zips/val2017.zip)
     - 2017 Train/Val annotations (wget http://images.cocodataset.org/annotations/annotations_trainval2017.zip)
-    
-    Extract these 3 files and put their content into previously created 'data' folder. Your project tree should look like this (most folders not shown for brewity):
+    - 2017 Test images (wget http://images.cocodataset.org/zips/test2017.zip) - unnecessary, but useful if you want to test it on COCO online evaluator (it yields bad results, however, due to weak clustering algorithm).
+    - 2017 Testing image info (wget http://images.cocodataset.org/annotations/image_info_test2017.zip) - again, not needed if you don't want to test it on COCO evaluations script. If you download it, rename annotations inside to test_annotations. 
+        
+    Extract these files and put their content into previously created 'data' folder. Your project tree should look like this (most folders not shown for brewity):
     - data
         - annotations
         - train2017
         - val2017
+        - test2017 (unnecessary)
+        - test_annotations (unnecessary)
     
     End of step 1:) Remove downloaded zipped files if you don't need them anymore.
 
@@ -72,12 +76,16 @@ run with no harm on reasonable younger/older versions)
     - annotations_path (path to FILE with annotations - that's the one with JSON extension)
     - labels_path (path to folder, where labels should be placed - it will be created automatically if not present yet)
     
-    YOU SHOULD GENERATE TRAIN AND VALIDATION SETS INDEPENDENTLY! Don't do anything with test data, because there are no annotations for this data.
+    YOU SHOULD GENERATE TRAIN AND VALIDATION SETS INDEPENDENTLY! Don't do anything with test data.
     Generally I used S = dst_w = dst_h. In case of generating training data, be prepared to very long wait - it tooks 5 hours on my laptop.
     
-    Example of usage:
-    - python prepare.py --dst_w=14 --dst_h=14 --annotations_path=data/annotations/instances_val2017.json --labels_path=data/labels_S14
+    Example of usage (the network is compatible with these params):
+    - python prepare.py --dst_w=14 --dst_h=14 --annotations_path=data/annotations/instances_val2017.json --labels_path=data/val_labels_S14
+    - python prepare.py --dst_w=14 --dst_h=14 --annotations_path=data/annotations/instances_train2017.json --labels_path=data/train_labels_S14
     
+    Ok, enough preprocessing, let's train it!
+    
+3. 
     
 ### Some results
 ![alt text](repo_images/0.jpg)
