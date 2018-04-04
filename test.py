@@ -1,4 +1,4 @@
-import json
+import argparse
 import os
 
 import cv2
@@ -7,72 +7,51 @@ import tensorflow as tf
 from architectures.conv_decoder import conv_decoder
 from architectures.pretrained_encoder import pretrained_encoder as encoder
 
-from constants import label_w as label_size
 from dataprovider_inference import DataProvider
-from utils import draw_predictions, valid_filenames, compute_coco_annotations, contid_to_COCOid
+from utils import draw_predictions
 
-# inference params
-model_name = 'model_s14'
-model_checkpoint = '62695'
-data_path = 'data/test2017'
-annotations_path = 'data/test_annotations/image_info_test-dev2017.json'
-thresh = 0.3
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Predicts bounding boxes for sample images')
+    parser.add_argument('--model_name', help='name of model', dest='model_name')
+    parser.add_argument('--model_checkpoint', help='number of checkpoint', dest='model_checkpoint')
+    parser.add_argument('--thresh', help='threshold, default value = 0.3', dest='thresh')
+    args = parser.parse_args()
 
-name_dict, filenames = valid_filenames(annotations_path, data_path)
+    model_name = args.model_name
+    model_checkpoint = args.model_checkpoint
+    thresh = float(args.thresh)
 
-# datasets
-dataset = DataProvider(filenames)
-images, names, iterator = dataset.get_data()
+    # datasets
+    filenames = ['sample_images/' + name for name in os.listdir('sample_images')]
+    dataset = DataProvider(filenames)
+    images, names, iterator = dataset.get_data()
 
-# model
-encoder = encoder(images)
-logits = conv_decoder(encoder)
-output = tf.nn.sigmoid(logits)
+    # model
+    encoder = encoder(images)
+    logits = conv_decoder(encoder)
+    output = tf.nn.sigmoid(logits)
 
-# loader
-loader = tf.train.Saver()
+    # loader
+    loader = tf.train.Saver()
 
-results = []
-with tf.Session() as sess:
-    sess.run(tf.global_variables_initializer())
-    loader.restore(sess, os.path.join('saved_models', model_name, 'model.ckpt-' + model_checkpoint))
+    results = []
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        loader.restore(sess, os.path.join('saved_models', model_name, 'model.ckpt-' + model_checkpoint))
 
-    i = 0
-    sess.run(iterator.initializer)
-    while True:
-        if i != 2:
-            sess.run([output, images, names])
-            i += 1
-            continue
-        try:
-            predictions, image, name = sess.run([output, images, names])  # since we are using only batchsize = 1
-            id, w, h = name_dict[name[0].decode()]['id'], name_dict[name[0].decode()]['height'], name_dict[name[0].decode()]['width']
+        i = 0
+        sess.run(iterator.initializer)
+        while True:
+            try:
+                predictions, image, name = sess.run([output, images, names])  # since we are using only batchsize = 1
+                mask = np.copy(predictions)
+                mask[mask >= thresh] = 1
+                mask[mask < thresh] = 0
 
-            mask = np.copy(predictions)
+                labelled_img, boxes = draw_predictions(image, mask, False, True)
+                print(np.max(labelled_img), np.min(labelled_img))
+                cv2.imwrite(name[0].decode(), labelled_img * 255)
 
-            mask[mask >= thresh] = 1
-            mask[mask < thresh] = 0
-
-            labelled_img, boxes = draw_predictions(image, mask, False, True)
-            scores = compute_coco_annotations(boxes, predictions[0], w, h, contid_to_COCOid, label_size)
-            for k, boxes in scores.items():
-                for box in boxes:
-                    results.append({
-                        'image_id': id,
-                        'category_id': k,
-                        'bbox': box[:4],
-                        'score': box[-1]
-                    })
-            cv2.imshow('', labelled_img)
-            cv2.waitKey(-1)
-            print('Processing image {} of {}'.format(i + 1, len(filenames)))
-            i += 1
-        except tf.errors.OutOfRangeError:
-            print("End of test set!")
-            break
-
-if not os.path.isdir('results'):
-    os.mkdir('results')
-
-with open('results/' + 'detections_test_dev2017_cellnets-' + model_name + '_results.json', 'w') as outfile:
-    json.dump(results, outfile)
+            except tf.errors.OutOfRangeError:
+                print("End of sample images!")
+                break

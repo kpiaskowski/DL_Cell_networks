@@ -46,7 +46,7 @@ Used libraries (versions are provided only for informational purpose - the code 
 run with no harm on reasonable younger/older versions)
 - tensorflow 1.4.1
 - numpy 1.14.1
-- opencv 3.3.0
+- opencv 3.3.1
 
 ### How to run it?
 1. 
@@ -66,8 +66,13 @@ run with no harm on reasonable younger/older versions)
         - test_annotations (unnecessary)
     
     End of step 1:) Remove downloaded zipped files if you don't need them anymore.
+    
+2. 
+    Create folder named 'pretrained_imagenet' in your main project directory, download weights pretrained on ImageNet classification task from https://drive.google.com/open?id=1L6lwpORCHMbU6_eyIu9MWHlvVl12RQgT ,
+    then put downloaded file into freshly created folder and rename the file to 'pretrained_imagenet'.
+   
 
-2. COCO Object Detection Dataset contains over 100k images with annotated
+3. COCO Object Detection Dataset contains over 100k images with annotated
     objects belonging to 80 classes. The network outputs tensor of shape SxSxC. S states for an
     arbitrary size. You could provide independent datasets for different architectures.
     To create dataset, run prepare.py with parameters:
@@ -85,7 +90,51 @@ run with no harm on reasonable younger/older versions)
     
     Ok, enough preprocessing, let's train it!
     
-3. 
+4. If you want to train your network from scratch, run train.py with params:
+   - model_name (name of model)  
+   - epochs (number of epochs, recommended value = 100)
+   - l_rate (learning rate, recommended value = 0.00001)
+   - thresh (threshold, default value = 0.3)
+   - batch_size (size of single batch, I used 15)
+   - saver_checkpoint (save every n iterations, recommended value = 1500)
+   - t_img_path (path to folder with train images)
+   - v_img_path (path to folder with validation images)
+   - t_label_path (path to folder with train labels)
+   - v_label_path (path to folder with validation labels)
+   
+   It will train your network and, log progress and metrics into saved_summaries/model_name and save every n iterations into saved_models/model_name
+   
+   Example of usage: 
+   python train.py --model_name=my_model --epochs=100 --l_rate=0.00001 --thresh=0.3 --batch_size=10 --saver_checkpoint=15 --t_img_path=data/train2017 --v_img_path=data/val2017 --t_label_path=data/train_labels_S14 --v_label_path=data/val_labels_S14
+
+   If you want to continue training from previously train model, apart from aforementioned params,
+   you should also provide checkpoint number:
+   - load_checkpoint (number of checkpoint, multiply of saver_checkpoint)
+   
+5. If you want to predict bounding boxes of objects on images, first create folder 'sample_images' in your main project folder,
+   then run test.py with params:
+   - model_name (name of model)  
+   - thresh (threshold, default value = 0.3)
+   - model_checkpoint (number of checkpoint)
+   
+   If you want to run model pretrained on COCO, download it from here:
+   https://drive.google.com/open?id=1_uECl9HKH-Bps6QTcPGa6rn21y97l7pP, extract and put into 'saved_models'.
+   
+   Example of usage:
+   python test.py --model_name=model_s14 --model_checkpoint=62695 --thresh=0.3
+   
+6. If you want to test your model on COCO dataset, first you need to generate COCO file with COCO_test.py with params;
+   - model_name (name of model)  
+   - thresh (threshold, default value = 0.3)
+   - model_checkpoint (number of checkpoint)
+   - data_path (path to folder with test images)
+   - annotations_path (path to test annotations)
+   - show_images (wheter show or not images, rather for debugging purpose, values t/f)
+   
+   Example of usage:
+   python COCO_test.py --model_name=model_s14 --model_checkpoint=62695 --data_path=data/test2017 --annotations_path=data/test_annotations/image_info_test-dev2017.json --thresh=0.3 --show_images=t
+
+      
     
 ### Some results
 ![alt text](repo_images/0.jpg)

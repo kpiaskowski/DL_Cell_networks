@@ -3,7 +3,7 @@ import os
 import numpy as np
 import tensorflow as tf
 
-from constants import img_w, img_h, label_w_conv, label_h_conv, label_w_ae, label_h_ae, label_w_vae, label_h_vae, C
+from constants import img_w, img_h, label_w, label_h, C
 
 
 class DataProvider:
@@ -11,7 +11,7 @@ class DataProvider:
     Provides data for neural network
     """
 
-    def __init__(self, mode, batch_size):
+    def __init__(self, batch_size):
         """
         Sets mode: conv, ae, vae - it changes image/label dimensiality
         :param mode: conv, ae or vae
@@ -21,17 +21,8 @@ class DataProvider:
         self.img_w = img_w
         self.img_h = img_h
 
-        if mode == 'conv_decoder':
-            self.label_w = label_w_conv
-            self.label_h = label_h_conv
-
-        elif mode == 'ae_decoder':
-            self.label_w = label_w_ae
-            self.label_h = label_h_ae
-
-        elif mode == 'vae_decoder':
-            self.label_w = label_w_vae
-            self.label_h = label_h_vae
+        self.label_w = label_w
+        self.label_h = label_h
 
     def dataset_resize_images(self, img_name, label_name):
         """

@@ -6,7 +6,6 @@ import time
 from multiprocessing import Value
 
 import numpy as np
-import psutil
 
 from utils import collect_annotations, create_full_mask, resize_mask, create_mask_dirs, calc_time_left, calc_pred_size
 
@@ -24,7 +23,7 @@ def create_masks(annotations_path, dst_dir, dst_w, dst_h):
     annotations_list = dataset['annotations']
     images = dataset['images']
 
-    num_processes = psutil.cpu_count()
+    num_processes = mp.cpu_count()
     data_len = len(images)
     divider = data_len / num_processes
 
