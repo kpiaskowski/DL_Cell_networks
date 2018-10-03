@@ -96,7 +96,7 @@ class DataProvider:
         """
         raise NotImplementedError
 
-    def _tf_define_dataset(self, image_data, annotation_data=None, num_epochs=None):
+    def _tf_define_dataset(self, image_names, annotation_data=None):
         """
         Creates TF dataset using DatasetAPI
         :param image_data: list of data snippets related to images (for example paths), dependent on dataset and tf_decode[...] functions
@@ -106,9 +106,9 @@ class DataProvider:
         """
         # for train and validation datasets
         if annotation_data:
-            tf_image_data = tf.constant(image_data)
+            tf_image_names = tf.constant(image_names)
             tf_annotation_data = tf.constant(annotation_data)
-            dataset = tf.data.Dataset.from_tensor_slices((tf_image_data, tf_annotation_data))
+            dataset = tf.data.Dataset.from_tensor_slices((tf_image_names, tf_annotation_data))
             dataset = dataset.shuffle(buffer_size=5000)
             dataset = dataset.map(lambda i, a: (self._tf_decode_images(i), a), num_parallel_calls=8)
             dataset = dataset.map(lambda i, a: (i, tf.py_func(self._tf_decode_annotation, [a], tf.uint8, stateful=False)), num_parallel_calls=8)
@@ -117,15 +117,15 @@ class DataProvider:
             dataset = dataset.repeat()
             return dataset
 
-        # for test set
+        # for test set, we add image names for further performance evaluation on online websites
         else:
-            tf_image_data = tf.constant(image_data)
-            dataset = tf.data.Dataset.from_tensor_slices((tf_image_data))
-            dataset = dataset.shuffle(buffer_size=5000)
-            dataset = dataset.map(self._tf_decode_images, num_parallel_calls=8)
+            tf_image_names = tf.constant(image_names)
+            dataset = tf.data.Dataset.from_tensor_slices((tf_image_names, tf_image_names)) # the second 'names' arg will serve as a pointer to the file during evaluation
+            # dataset = dataset.map(self._tf_decode_images, num_parallel_calls=8)
+            dataset = dataset.map(lambda i, a: (self._tf_decode_images(i), a), num_parallel_calls=8)
             dataset = dataset.prefetch(self.batch_size)
             dataset = dataset.batch(self.batch_size)
-            dataset = dataset.repeat(num_epochs)
+            dataset = dataset.repeat(1)
             return dataset
 
     def train_val_dataset(self):
@@ -148,8 +148,7 @@ class PascalProvider(DataProvider):
         Note that after downloading data from PascalVOC site, these dirs are named differently. You need to rename them by yourself. See below to find out how
         to map Pascal data into train/validation/test data. Also, do not change anything within the folders themselves (the structure: Annotations, ImageSets,
         JPEGImages ... ) should be preserved). For final testing, we use data from PascalVOC2012, specified as test data, and evaluate it online
-        :param training_dirs: tuple containing paths to root training directories, for 2007 and 2012. We use trainval data, which means that we use all data from
-        2007 and 2012 for training.
+        :param training_dirs: tuple containing paths to root training directories, for 2007 and 2012. We use trainval data, which means that we use all data from 2007 and 2012 for training.
         :param validation_dir: path to root test directory. For validation (and final testing) we use data from PascalVOC 2007 test set.
         :param test_dir: we use test data from Pascal2012
         """
@@ -267,10 +266,37 @@ class PascalProvider(DataProvider):
         Create TF Dataset for for testing, using one shot iterator
         :return: handle to test dataset (only images) and its iterator
         """
-        test_dataset = self._tf_define_dataset(self.test_data, None, 1)
+        test_dataset = self._tf_define_dataset(self.test_data, None)
         iterator = test_dataset.make_initializable_iterator()
-        images = iterator.get_next()
-        return images, iterator
+        images, filenames = iterator.get_next()
+        return images, filenames, iterator
+
+
+class COCOProvider(DataProvider):
+    """Dataprovider for Ms COCO dataset (from 2017)"""
+
+    def __init__(self, training_dir, validation_dir, test_dir, annotations_dir, img_h, img_w, h, w, batch_size):
+        """
+        Initializes COCO dataset.
+        :param training_dir: path to COCO 'train2017' dir
+        :param validation_dir: path to COCO 'val2017' dir
+        :param test_dir: path to COCO 'test2017' dir
+        :param annotations_dir: path to COCO 'annotations' dir
+        :param img_h: desired image height (images will be resized to this height)
+        :param img_w: desired image width (images will be resized to this width)
+        :param h: desired occupancy tensor height
+        :param w: desired occupancy tensor width
+        :param batch_size: the size of batch
+        """
+        super().__init__(img_h, img_w, h, w, batch_size)
+
+
+provider = COCOProvider(training_dir='../data/MsCOCO/train2007',
+                        validation_dir='../data/MsCOCO/val2007',
+                        test_dir='../data/MsCOCO/test2007',
+                        annotations_dir='../data/MsCOCO/annotations',
+                        img_h=448, img_w=448, h=28, w=28,
+                        batch_size=10)
 
 
 # an example of how to use and how the data is shaped
@@ -283,7 +309,7 @@ if __name__ == '__main__':
                                      batch_size=10)
 
     handle, train_iter, val_iter, images, occupancy_tensors = pascal_provider.train_val_dataset()
-    test_images, test_iter = pascal_provider.test_dataset()
+    test_images, test_filenames, test_iter = pascal_provider.test_dataset()
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -291,11 +317,10 @@ if __name__ == '__main__':
         # PASCAL data - train/val
         train_handle, val_handle = sess.run([train_iter.string_handle(), val_iter.string_handle()])
 
-        for i in range(1000):
-            imgs, occ_tensor = sess.run([images, occupancy_tensors], feed_dict={handle: train_handle})
-            print('PASCAL (train and val): img shape: {}, occup_tensor shape: {}'.format(imgs.shape, occ_tensor.shape))
+        imgs, occ_tensor = sess.run([images, occupancy_tensors], feed_dict={handle: train_handle})
+        print('PASCAL (train and val): img shape: {}, occup_tensor shape: {}'.format(imgs.shape, occ_tensor.shape))
 
         # PASCAL data - test
         sess.run(test_iter.initializer)
-        imgs = sess.run(test_images)
-        print('PASCAL (test): img shape: {}'.format(imgs.shape))
+        imgs, names = sess.run([test_images, test_filenames])
+        print('PASCAL (test): img shape: {}, names: {}'.format(imgs.shape, names.shape))
