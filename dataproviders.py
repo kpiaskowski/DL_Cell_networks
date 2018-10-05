@@ -1,3 +1,6 @@
+import cv2
+import json
+import math
 import os
 import xml.etree.ElementTree as ET
 
@@ -24,7 +27,8 @@ class DataProvider:
         self.batch_size = batch_size
 
         # these variables are dataset dependent and will be created in child classes
-        self.classes = None
+        self.class_to_id = None  # a generic mapping, because not every dataset uses a one to one index - class maping (see COCO)
+        self.id_to_class = None  # a generic mapping, because not every dataset uses a one to one index - class maping (see COCO)
         self.train_data = None
         self.val_data = None
         self.test_data = None
@@ -32,12 +36,12 @@ class DataProvider:
     def _create_occupancy_tensor(self, object_list, img_h, img_w, h, w, c):
         """
         Creates an occupancy tensor, based on object list
-        :param object_list: : a list of tuples in form: (class_name, (xmin, ymin, xmax, ymax))
+        :param object_list: : a list of tuples in form: (class_id, (xmin, ymin, xmax, ymax))
         :param img_h: height of image
         :param img_w: width of image
-        :param h: desired height of occupance tensor
-        :param w: desired width of occupance tensor
-        :param c: number of classes in occupance tensor
+        :param h: desired height of occupancy tensor
+        :param w: desired width of occupancy tensor
+        :param c: number of classes in occupancy tensor
         :return: occupancy tensor
         """
         tensor = np.zeros([h, w, c], np.uint8)
@@ -45,7 +49,7 @@ class DataProvider:
         # fill tensor
         for obj_info in object_list:
             # index of class and unnormalized dimensions of object
-            class_idx = self.classes.index(obj_info[0])
+            class_idx = obj_info[0]
             xmin, ymin, xmax, ymax = obj_info[1]
 
             # normalize dimensions with regard to image size
@@ -84,9 +88,13 @@ class DataProvider:
         :return: decoded image
         """
         image_string = tf.read_file(image)
-        image_decoded = tf.image.decode_jpeg(image_string)
+        image_decoded = tf.image.decode_jpeg(image_string, channels=3)
         image_resized = tf.image.resize_images(image_decoded, [self.img_h, self.img_w])
-        return image_resized
+        image_scaled = image_resized / 255
+        # switch bgr to rgb
+        channels = tf.unstack(image_scaled, axis=2)
+        image_rgb = tf.stack([channels[2], channels[1], channels[0]], axis=2)
+        return image_rgb
 
     def _tf_decode_annotation(self, annotation):
         """
@@ -105,7 +113,7 @@ class DataProvider:
         :return: TF dataset
         """
         # for train and validation datasets
-        if annotation_data:
+        if annotation_data is not None:
             tf_image_names = tf.constant(image_names)
             tf_annotation_data = tf.constant(annotation_data)
             dataset = tf.data.Dataset.from_tensor_slices((tf_image_names, tf_annotation_data))
@@ -120,8 +128,8 @@ class DataProvider:
         # for test set, we add image names for further performance evaluation on online websites
         else:
             tf_image_names = tf.constant(image_names)
-            dataset = tf.data.Dataset.from_tensor_slices((tf_image_names, tf_image_names)) # the second 'names' arg will serve as a pointer to the file during evaluation
-            # dataset = dataset.map(self._tf_decode_images, num_parallel_calls=8)
+            # the second 'names' arg will serve as a pointer to the file during evaluation
+            dataset = tf.data.Dataset.from_tensor_slices((tf_image_names, tf_image_names))
             dataset = dataset.map(lambda i, a: (self._tf_decode_images(i), a), num_parallel_calls=8)
             dataset = dataset.prefetch(self.batch_size)
             dataset = dataset.batch(self.batch_size)
@@ -129,6 +137,7 @@ class DataProvider:
             return dataset
 
     def train_val_dataset(self):
+        """Create TF datasets for training and validation data"""
         raise NotImplementedError
 
     def test_dataset(self):
@@ -155,9 +164,12 @@ class PascalProvider(DataProvider):
         super().__init__(img_h, img_w, h, w, batch_size)
 
         # dataset specific info
+        print('Please wait, preparing PascalVOC dataset...')
         self.classes = ["person", "bird", "cat", "cow", "dog", "horse", "sheep", "aeroplane", "bicycle", "boat", "bus", "car", "motorbike", "train",
                         "bottle", "chair", "diningtable", 'pottedplant', "sofa", "tvmonitor"]
         self.num_classes = len(self.classes)
+        self.class_to_id = {k: i for i, k in enumerate(self.classes)}
+        self.id_to_class = {i: k for i, k in enumerate(self.classes)}
 
         # data in form: list(image paths), list(annotation paths), except for test data, where only list(image paths) is provided
         self.train_data, self.val_data = self._pair_images_with_annotations(training_dirs=training_dirs, validation_dir=validation_dir)
@@ -238,7 +250,7 @@ class PascalProvider(DataProvider):
             ymin = int(bbox.find('ymin').text)
             ymax = int(bbox.find('ymax').text)
 
-            object_list.append((cls, (xmin, ymin, xmax, ymax)))
+            object_list.append((self.class_to_id[cls], (xmin, ymin, xmax, ymax)))
 
         # create the ocupancy tensor
         return self._create_occupancy_tensor(object_list, img_h, img_w, h, w, c)
@@ -264,7 +276,7 @@ class PascalProvider(DataProvider):
     def test_dataset(self):
         """
         Create TF Dataset for for testing, using one shot iterator
-        :return: handle to test dataset (only images) and its iterator
+        :return: handle to test dataset (only images), image names (for future easier evaluation) and its iterator
         """
         test_dataset = self._tf_define_dataset(self.test_data, None)
         iterator = test_dataset.make_initializable_iterator()
@@ -289,19 +301,149 @@ class COCOProvider(DataProvider):
         :param batch_size: the size of batch
         """
         super().__init__(img_h, img_w, h, w, batch_size)
+        self.annotations_dir = annotations_dir
+        self.test_dir = test_dir
+        self.validation_dir = validation_dir
+        self.training_dir = training_dir
 
+        print('Please wait, preparing COCO dataset...')
+        self.id_to_class, self.class_to_id = self.read_categories()
+        self.num_classes = max(self.id_to_class.keys()) + 1  # we allow for empty ids for the sake of convenience
+        self.train_data, self.val_data = self._pair_images_with_annotations()
+        self.test_data = [os.path.join(self.test_dir, name) for name in os.listdir(self.test_dir)]
 
-provider = COCOProvider(training_dir='../data/MsCOCO/train2007',
-                        validation_dir='../data/MsCOCO/val2007',
-                        test_dir='../data/MsCOCO/test2007',
-                        annotations_dir='../data/MsCOCO/annotations',
-                        img_h=448, img_w=448, h=28, w=28,
-                        batch_size=10)
+    def read_categories(self):
+        """Creates a list of classes as well as id-class and class-id mapping for COCO dataset (because class ids don't make a consecutive order in COCO)"""
+        json_file = os.path.join(self.annotations_dir, 'instances_val2017.json')
+        with open(json_file, 'rb') as f:
+            parsed_json = json.load(f)
+            categories = parsed_json['categories']
+
+            # create mappings
+            id_to_class = {entry['id']: entry['name'] for entry in categories}
+            class_to_id = {i: k for k, i in id_to_class.items()}
+            return id_to_class, class_to_id
+
+    def train_val_dataset(self):
+        """
+        Creates TF Dataset for training and validation. Remember to initialize respective hooks manually.
+        :return: handles for both datasets and data hooks (images and occupancy tensors)
+        """
+        # feedable iterators for train and validation
+        train_dataset = self._tf_define_dataset(self.train_data[0], self.train_data[1])
+        val_dataset = self._tf_define_dataset(self.val_data[0], self.val_data[1])
+
+        # iterators for dataset
+        handle = tf.placeholder(tf.string, shape=[])
+        iter = tf.data.Iterator.from_string_handle(handle, train_dataset.output_types, train_dataset.output_shapes)
+        images, occupancy_tensors = iter.get_next()
+        train_iter = train_dataset.make_one_shot_iterator()
+        val_iter = val_dataset.make_one_shot_iterator()
+
+        return handle, train_iter, val_iter, images, occupancy_tensors
+
+    def _annotation_encoder(self, annotation_dict):
+        """
+        Encodes annotation as string.
+        :param annotation_dict: annotation in form {img_h: ..., img_w: ..., object_list: []}, where object list is a nested tuple of tuples [class_id, bbox]
+        :return: annotation encoded as string
+        """
+
+        # local function for flattening
+        def flatten(container):
+            for i in container:
+                if isinstance(i, (list, tuple)):
+                    for j in flatten(i):
+                        yield j
+                else:
+                    yield i
+
+        # flatten list
+        flat_obj_list = list(flatten([annotation_dict['img_h'], annotation_dict['img_w'], annotation_dict['object_list']]))
+        annotation_string = str(flat_obj_list)
+        return annotation_string
+
+    def _annotation_decoder(self, string_annotation):
+        """
+        Annotation in the form of string.
+        :param string_annotation: string describing a flattened annotation.
+        :return: img_h, img_w, object_list
+        """
+        flat_list = string_annotation.lstrip('[').rstrip(']').split(',')
+        img_h = int(flat_list[0])
+        img_w = int(flat_list[1])
+
+        flat_obj_list = flat_list[2:]
+        num_objects = len(flat_obj_list) // 5  # since each object is described with 5 numbers: class_id, xmin, ymin, xmax, ymax
+        object_list = [[int(flat_obj_list[i]),  # class id
+                        [int(flat_obj_list[i + 1]), int(flat_obj_list[i + 2]), int(flat_obj_list[i + 3]), int(flat_obj_list[i + 4])]]  # xmin ... ymax
+                       for i in range(0, 5 * num_objects, 5)]
+        return img_h, img_w, object_list
+
+    def test_dataset(self):
+        """
+        Create TF Dataset for for testing, using one shot iterator
+        :return: handle to test dataset (only images), image names (for future easier evaluation) and its iterator
+        """
+        test_dataset = self._tf_define_dataset(self.test_data, None)
+        iterator = test_dataset.make_initializable_iterator()
+        images, filenames = iterator.get_next()
+        return images, filenames, iterator
+
+    def _tf_decode_annotation(self, annotation_string):
+        """
+        Decodes COCO annotation info.
+        :param annotation_string: annotation as string (due to TF hack), contatining information about img_h, img_w and object_list
+        """
+        img_h, img_w, object_list = self._annotation_decoder(annotation_string.decode())
+        return self._create_occupancy_tensor(object_list, img_h, img_w, self.h, self.w, self.num_classes)
+
+    def _pair_images_with_annotations(self, **kwargs):
+        """
+        Pairs images with corresponding annotations for data from COCO.
+        :param kwargs:
+        :return: two lists: one with filenames of images and second with corresponding nested list in form: [img_h, img_w, bboxes],
+        where each bbox is a tuple: (class_id, xmin, ymin, xmax, ymax)
+        """
+        data = []
+        json_paths = (os.path.join(self.annotations_dir, name) for name in ('instances_train2017.json', 'instances_val2017.json'))
+        for json_path, data_path in zip(json_paths, (self.training_dir, self.validation_dir)):
+            # load json file
+            with open(json_path, 'rb') as f:
+                parsed_json = json.load(f)
+                # for making the process of associating filenames with annotations easier
+                img_annotation_dict = {entry['id']: {'filename': os.path.join(data_path, entry['file_name']),
+                                                     'img_h': entry['height'],
+                                                     'img_w': entry['width'],
+                                                     'object_list': []} for entry in parsed_json['images']}
+                # assign annotations to images
+                for annotation in parsed_json['annotations']:
+                    # create bbox information from COCO annotation info (in COCO, bbox coordinates are not round integers, but floats in form (x, y, w, h)
+                    bbox = annotation['bbox']
+                    xmin = math.floor(bbox[0])
+                    ymin = math.floor(bbox[1])
+                    xmax = xmin + math.floor(bbox[2])
+                    ymax = ymin + math.floor(bbox[3])
+                    class_id = annotation['category_id']
+
+                    # assign extracted bbox and class data to image
+                    img_id = annotation['image_id']
+                    img_annotation_dict[img_id]['object_list'].append([class_id, [xmin, ymin, xmax, ymax]])
+
+                # convert data into two lists mentioned in method description
+                image_names, annotations = [], []
+                for _, info in img_annotation_dict.items():
+                    image_names.append(info['filename'])
+                    # unfortunately, annotations cannot be passed into tf dataset api as dicts or nested strings, we need to convert them to strings
+                    annotations.append(self._annotation_encoder({'img_h': info['img_h'], 'img_w': info['img_w'], 'object_list': info['object_list']}))
+                data.append((image_names, annotations))
+        # training data, validation data, each in form of two lists: image paths and corresponding descriptions
+        return data[0], data[1]
 
 
 # an example of how to use and how the data is shaped
 if __name__ == '__main__':
-    # pascal data
+    # PascalVOC data
     pascal_provider = PascalProvider(training_dirs=('../data/PascalVOC/VOC2007_train', '../data/PascalVOC/VOC2012_train'),
                                      validation_dir='../data/PascalVOC/VOC2007_test',
                                      test_dir=None,  # todo
@@ -316,7 +458,6 @@ if __name__ == '__main__':
 
         # PASCAL data - train/val
         train_handle, val_handle = sess.run([train_iter.string_handle(), val_iter.string_handle()])
-
         imgs, occ_tensor = sess.run([images, occupancy_tensors], feed_dict={handle: train_handle})
         print('PASCAL (train and val): img shape: {}, occup_tensor shape: {}'.format(imgs.shape, occ_tensor.shape))
 
@@ -324,3 +465,27 @@ if __name__ == '__main__':
         sess.run(test_iter.initializer)
         imgs, names = sess.run([test_images, test_filenames])
         print('PASCAL (test): img shape: {}, names: {}'.format(imgs.shape, names.shape))
+
+    # COCO data
+    coco_provider = COCOProvider(training_dir='../data/MsCOCO/train2017',
+                                 validation_dir='../data/MsCOCO/val2017',
+                                 test_dir='../data/MsCOCO/test2017',
+                                 annotations_dir='../data/MsCOCO/annotations',
+                                 img_h=448, img_w=448, h=28, w=28,
+                                 batch_size=10)
+
+    handle, train_iter, val_iter, images, occupancy_tensors = coco_provider.train_val_dataset()
+    test_images, test_filenames, test_iter = coco_provider.test_dataset()
+
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+
+        # COCO data - train/val
+        train_handle, val_handle = sess.run([train_iter.string_handle(), val_iter.string_handle()])
+        imgs, occ_tensor = sess.run([images, occupancy_tensors], feed_dict={handle: train_handle})
+        print('COCO (train and val): img shape: {}, occup_tensor shape: {}'.format(imgs.shape, occ_tensor.shape))
+
+        # COCO data - test
+        sess.run(test_iter.initializer)
+        imgs, names = sess.run([test_images, test_filenames])
+        print('COCO (test): img shape: {}, names: {}'.format(imgs.shape, names.shape))
