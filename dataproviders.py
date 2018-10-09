@@ -1,4 +1,3 @@
-import cv2
 import json
 import math
 import os
@@ -107,9 +106,8 @@ class DataProvider:
     def _tf_define_dataset(self, image_names, annotation_data=None):
         """
         Creates TF dataset using DatasetAPI
-        :param image_data: list of data snippets related to images (for example paths), dependent on dataset and tf_decode[...] functions
+        :param image_names: list of data snippets related to images (for example paths), dependent on dataset and tf_decode[...] functions
         :param annotation_data: list of data snippets related to images (for example paths), dependent on dataset and tf_decode[...] functions
-        :param num_epochs: number of epochs: if none, then run infinitely times
         :return: TF dataset
         """
         # for train and validation datasets
@@ -226,10 +224,11 @@ class PascalProvider(DataProvider):
     def _annotation_to_tensor(self, xml_file, h, w, c):
         """
         Parses annotation information (XML file in PASCAL) and converts it into an occupancy tensor of shape [h, w, num_classes]
+        :param xml_file: path to the xml file
         :param h: desired tensor height
         :param w: desired tensor width
         :param c: number of classes
-        :return a tensor of shape [h,c,c], filled with ones, where objects are present and zeros otherwise
+        :return a tensor of shape [h,w,c], filled with ones, where objects are present and zeros otherwise
         """
         # create the tree from file
         tree = ET.parse(xml_file)
